@@ -2,7 +2,10 @@ from bot import bot, qiwi_wallet, currency_converter
 from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill
+
 from aioqiwi.wallet import types as aioqiwi_types
+from aiogram.utils.markdown import hlink
+from aiogram import types
 
 
 @qiwi_wallet.hm()
@@ -32,16 +35,22 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
         user_id = int(payment.comment)
 
         if payment.status != "SUCCESS":
-            message_text.append(f"ID пользыватель {user_id} найден в базе, но во время пополнения произошла ошибка.")
-            bot.send_message(chat_id=user_id, text=f"Во время пополнения баланса произошла ошибка. Номер транзакции: {payment.txn_id}. Код ошибки: {payment.error_code}")
+            message_text.append(f"ID пользыватель {hlink(title=user_id, url=f'tg://user?id={user_id}')} найден в базе, но во время пополнения произошла ошибка.")
+            try:
+                await bot.send_message(chat_id=user_id, text=f"Во время пополнения баланса произошла ошибка. Номер транзакции: {payment.txn_id}. Код ошибки: {payment.error_code}")
+            except Exception:
+                pass
         else:
             user = User.where(user_id=int(payment.comment)).first()
             old_balance = user.balance
             user.update(balance=old_balance + amount_rub)
 
-            bot.send_message(chat_id=user_id, text=f"Ваш баланс успешно пополнен на сумму {amount_rub}. Номер транзакции: {payment.txn_id}")
-            message_text.append(f"Баланс успешно зачислен ID пользывателю: [{user_id}]")
+            try:
+                await bot.send_message(chat_id=user_id, text=f"Ваш баланс успешно пополнен на сумму {amount_rub}. Номер транзакции: {payment.txn_id}")
+            except Exception:
+                pass
+            message_text.append(f"Баланс успешно зачислен ID пользывателю {hlink(title=user_id, url=f'tg://user?id={user_id}')}")
 
         Refill.create(user_id=user_id, txn_id=payment.txn_id, amount=amount_rub, data=payment.json())
 
-    await bot.send_message(chat_id=config.ADMIN_ID, text='\n'.join(message_text))
+    await bot.send_message(chat_id=config.ADMIN_ID, text='\n'.join(message_text), parse_mode=types.ParseMode.HTML)

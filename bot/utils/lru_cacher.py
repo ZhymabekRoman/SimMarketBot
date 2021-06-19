@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
 from collections import OrderedDict
 
-from icecream import ic
-
 
 class LRUDictCache(OrderedDict):
 
@@ -12,7 +10,6 @@ class LRUDictCache(OrderedDict):
         super().__init__(*args, **kwds)
 
     def __getitem__(self, key):
-        ic("__getitem__ is called!")
         value, expiration = super().__getitem__(key)
 
         if datetime.utcnow() >= expiration:
@@ -23,7 +20,6 @@ class LRUDictCache(OrderedDict):
         return value
 
     def __setitem__(self, key, value):
-        ic("__setitem__ is called!")
         if key in self:
             self.move_to_end(key)
         expiration = datetime.utcnow() + self.lifetime

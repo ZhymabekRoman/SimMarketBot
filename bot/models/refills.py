@@ -1,15 +1,21 @@
 import sqlalchemy as sa
 from bot.models import BaseModel
+import enum
+
+
+class RefillSource(enum.Enum):
+    QIWI = 0
+    ADMIN = 1
+    REFERRAL = 3
 
 
 class Refill(BaseModel):
     __tablename__ = 'refills'
 
-    id = sa.Column(sa.Integer, unique=True, primary_key=True, index=True, autoincrement=True)
+    txn_id = sa.Column(sa.Integer, nullable=False, unique=True, primary_key=True, index=True)
     user_id = sa.Column(sa.Integer, sa.ForeignKey('users.user_id'))
-    txn_id = sa.Column(sa.Integer, nullable=False)
     amount = sa.Column(sa.Float, nullable=False)
-    data = sa.Column(sa.JSON, nullable=False)
-    source = sa.Column(sa.Text, default="qiwi")
+    data = sa.Column(sa.JSON, default={}, nullable=False)
+    source = sa.Column(sa.Enum(RefillSource), default=RefillSource.QIWI)
 
-    payer = sa.orm.relationship("User", backref="refills", foreign_keys="User.user_id")
+    payer = sa.orm.relationship("User", backref="refills")

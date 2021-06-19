@@ -1,6 +1,6 @@
 import os
 
-assert os.path.isdir("bot/user_data"), "Configuration folder is missing, please initialize it using script init_configuration.py"
+assert os.path.isdir(os.path.join("bot", "user_data")), "Configuration folder is missing, please initialize it using script init_configuration.py"
 
 import asyncio
 import logging
@@ -12,6 +12,7 @@ from aiogram import Bot, Dispatcher
 from bot.models import Base, BaseModel
 from bot.models.user import User
 from bot.models.onlinesim import Onlinesim
+from bot.models.refills import Refill
 from bot.utils.base64 import base64_decode
 from bot.user_data import config
 
@@ -32,7 +33,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 API_TOKEN = base64_decode(config.API_TOKEN)
 
 # Configure FSM Storage
-storage = JSONStorage("bot/user_data/FSM_storage.json")
+storage = JSONStorage(os.path.join("bot", "user_data", "FSM_storage.json"))
 
 # Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)
@@ -44,7 +45,7 @@ with resources.path("bot.user_data", "database.db") as sqlite_filepath:
 
 session = scoped_session(sessionmaker(bind=engine, autocommit=True))
 
-Base.metadata.drop_all(engine)
+# Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
 BaseModel.set_session(session)
 

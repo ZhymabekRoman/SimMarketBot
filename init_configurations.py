@@ -11,7 +11,7 @@ def base64_encode(message: str) -> str:
     return base64_message
 
 
-CONFIG_DIR = "bot/user_data"
+CONFIG_DIR = os.path.join("bot", "user_data")
 
 
 async def main():
@@ -20,7 +20,10 @@ async def main():
     # Создаём папку где будут храниться конфигурационные данные
     os.makedirs(CONFIG_DIR)
 
-    with open(f"{CONFIG_DIR}/database.db", "w") as file:
+    with open(os.path.join(CONFIG_DIR, "database.db"), "w") as file:
+        pass
+
+    with open(os.path.join(CONFIG_DIR, "__init__.py"), "w") as file:
         pass
 
     bot_api_token = input("Пожалуйста ведите Bot API токен Телеграм бота: ")
@@ -38,7 +41,7 @@ async def main():
 
     admin_username = input("Введите юзернем админа, который будет отвечать за мониторингом пополнение баланса, с знаком @ (например - @example): ")
 
-    with open(f"{CONFIG_DIR}/config.py", "w") as file:
+    with open(os.path.join(CONFIG_DIR, "config.py"), "w") as file:
         file.write("# Declare Telegram Bot API token\n")
         file.write(f"API_TOKEN = '{base64_encode(bot_api_token)}'\n")
         file.write("# Declare main admin user id\n")
@@ -48,15 +51,13 @@ async def main():
         file.write("# Declare QIWI API token\n")
         file.write(f"QIWI_API_TOKEN = '{base64_encode(qiwi_api_token)}'\n")
         file.write("# Declare commission amount\n")
-        file.write(f"COMMISSION_AMOUNT = '{commission_amount}'\n")
+        file.write(f"COMMISSION_AMOUNT = {commission_amount}\n")
         file.write("# Declare ExchangeRate API token\n")
         file.write(f"EXCHANGE_RATE_API_TOKEN = '{base64_encode(exchangerate_rate_token)}'\n")
         file.write("# Declare Online SIM service API tolen\n")
         file.write(f"ONLINE_SIM_API_TOKEN = '{base64_encode(onlinesim_api_token)}'")
         file.write("# Declare admin username\n")
-        file.write(f"ADMIN_USERNAME = {admin_username}\n")
-
-    open(f"{CONFIG_DIR}/__init__.py", "a")
+        file.write(f"ADMIN_USERNAME = '{admin_username}'\n")
 
     print("Готово!")
 

@@ -4,7 +4,8 @@ import datetime
 import asyncio
 import pytz
 
-from bot.events.onlinesim import onlinesim_msg_code_event
+# from bot.services.scheduler import scheduler
+from bot.events.onlinesim import onlinesim_msg_code_event  # , onlinesim_close_operation
 from bot.models.onlinesim import OnlinesimStatus
 from bot.utils.lru_cacher import LRUDictCache
 
@@ -35,7 +36,7 @@ class OnlineSIM:
 
         _result = {}
         for country_code, country in parsed.items():
-            if country["visible"] == 1:
+            if country["visible"] == 1 and await self.summary_numbers_count(country_code) != 0:
                 _result.update({country_code: country["rus"]})
         return _result
 
@@ -55,7 +56,8 @@ class OnlineSIM:
 
         _result = {}
         for _, service in parsed["services"].items():
-            _result.update({service["slug"]: service})
+            if service["count"] != 0:
+                _result.update({service["slug"]: service})
 
         return _result
 
@@ -78,40 +80,27 @@ class OnlineSIM:
             result = await response.text()
             parsed = json.loads(result)
 
-        status = bool(parsed.get("response") == 1)
+        ic(parsed)
+
+        status = parsed.get("response")
         tzid = parsed.get("tzid")
 
         return status, tzid
 
-    """
-    async def number_state(self, tzid: int):
-        # url = "https://onlinesim.ru/api/getState.php"
-        url = "https://onlinesim.ru/demo/api/getState.php"
-        params = {"apikey": self.__api_key, "tzid": tzid, "message_to_code": 0}
-
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
-
-        # status = bool(parsed.get("response") == 1)
-        # id = parsed.get("tzid")
-
-        return parsed
-    """
-
     async def stateOne(
         self,
         tzid: int,
-        message_to_code: int = 1,
+        message_to_code: int = 0,
         msg_list: bool = 1,
-        clean: bool = 1,
+        clean: bool = 0,
         repeat: bool = 0,
     ):
         type = "index"
         if repeat:
             type = "repeat"
 
-        url = "https://onlinesim.ru/demo/api/getState.php"
+        # url = "https://onlinesim.ru/demo/api/getState.php"
+        url = "https://onlinesim.ru/api/getState.php"
         params = {
             "apikey": self.__api_key,
             "tzid": tzid,
@@ -128,45 +117,72 @@ class OnlineSIM:
 
         return parsed
 
-    async def run_waiting_code_task(self, tzid: int, timeout=14, callback=onlinesim_msg_code_event):
-        waiting_code_task = self.loop.create_task(self.wait_code(tzid, timeout, callback))
+    async def run_waiting_code_task(self, tzid: int, service: str, callback=onlinesim_msg_code_event):
+        task_stats = await self.stateOne(tzid)
 
+        for _service in task_stats:
+            if _service["service"].lower() == service.lower():
+                service_stat = _service
+                break
+
+        waiting_code_task = self.loop.create_task(self.wait_code(tzid, service_stat["time"] - 10, callback))
         self.tasks[tzid] = waiting_code_task
 
-    async def wait_code(
-        self, tzid: int, timeout=14, callback=None, not_end=False, full_message=False
-    ):
-        __last_code = (tzid, None, OnlinesimStatus.error)
-        _response_type = 1
-        if full_message:
-            _response_type = 0
+        return service_stat
 
-        end_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')) + datetime.timedelta(minutes=timeout)
+    async def wait_code(self, tzid: int, timeout: int, callback, not_end=False):
+        __response_msg = None
+        __last_code = (tzid, __response_msg, OnlinesimStatus.error)
+
+        end_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')) + datetime.timedelta(seconds=timeout)
 
         try:
             while True:
-                await asyncio.sleep(timeout)
-                if end_date < datetime.datetime.now(pytz.timezone('Europe/Moscow')):
-                    __last_code = (tzid, None, OnlinesimStatus.expire)
-                    await self.close(tzid)
-                    break
-                response = await self.stateOne(tzid, _response_type, 1)
-                if "msg" in response and not not_end and response["msg"] != __last_code and response["msg"] is not False:
-                    __last_code = (tzid, response["msg"], OnlinesimStatus.success)
-                    await self.close(tzid)
-                    break
-                elif "msg" in response and not_end and response["msg"] != __last_code and response["msg"] is not False:
-                    __last_code = (tzid, response["msg"], OnlinesimStatus.success)
-                    await self.next(tzid)
-                    break
-        except asyncio.CancelledError:
-            __last_code = (tzid, None, OnlinesimStatus.cancel)
-            await self.close(tzid)
-        finally:
-            if callback:
-                await callback(__last_code)
+                await asyncio.sleep(10)
 
-            return __last_code
+                if end_date < datetime.datetime.now(pytz.timezone('Europe/Moscow')):
+                    if __response_msg is None:
+                        __status = OnlinesimStatus.expire
+                    else:
+                        __status = OnlinesimStatus.success
+                    __last_code = (tzid, __response_msg, __status)
+                    await callback(__last_code)
+                    await self.close(tzid)
+                    del self.tasks[tzid]
+                    break
+
+                response = await self.stateOne(tzid)
+                ic("Make pool")
+
+                if "msg" in response and response["msg"] != __response_msg and response["msg"] is not False:
+                    ic("New message found")
+                    __response_msg = response["msg"]
+                    __last_code = (tzid, __response_msg, OnlinesimStatus.waiting)
+                    ic(__response_msg)
+                    ic(type(__response_msg))
+                    await callback(__last_code)
+                    await self.next(tzid)
+
+        except asyncio.CancelledError:
+            ic("Close task")
+            if __response_msg is None:
+                __status = OnlinesimStatus.cancel
+            else:
+                __status = OnlinesimStatus.success
+            __last_code = (tzid, __response_msg, OnlinesimStatus.cancel)
+            await callback(__last_code)
+            await self.close(tzid)
+            del self.tasks[tzid]
+            raise
+        except Exception:
+            await callback(__last_code)
+            del self.tasks[tzid]
+            await self.close(tzid)
+        # finally:
+        #     if callback:
+        #         await callback(__last_code)
+
+        #     return __last_code
 
     async def next(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationRevise"
@@ -177,6 +193,8 @@ class OnlineSIM:
         async with self.session.get(url=url, params=params) as response:
             result = await response.text()
             parsed = json.loads(result)
+
+        ic(parsed)
 
         return parsed
 
@@ -189,6 +207,12 @@ class OnlineSIM:
         async with self.session.get(url=url, params=params) as response:
             result = await response.text()
             parsed = json.loads(result)
+
+        ic(parsed)
+
+        # if parsed.get("response") == "TRY_AGAIN_LATER":
+        #     ic("Schedule task to close")
+        #     scheduler.add_job(onlinesim_close_operation, "date", id=tzid, run_date=datetime.datetime.utcnow() + datetime.timedelta(minutes=3), kwargs={"tzid": tzid})
 
         return parsed
 
