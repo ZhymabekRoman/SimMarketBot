@@ -6,7 +6,7 @@ from bot.models.onlinesim import Onlinesim, OnlinesimStatus
 async def onlinesim_msg_code_event(event):
     tzid, msg, status = event
 
-    ic("Onlinesim event", event)
+    # ic("Onlinesim event", event)
 
     task_info = Onlinesim.where(tzid=tzid).first()
     task_info.update(status=status, msg=msg)

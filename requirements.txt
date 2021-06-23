@@ -1,3 +1,0 @@
-aiogram==2.13
-aioqiwi==1.1.5
-icecream

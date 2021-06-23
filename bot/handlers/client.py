@@ -315,7 +315,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
         f"▫️ Длительность действия номера: {task_info.timeout} секунд",
-        f"▫️ Время окончания действия номера: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + datetime.timedelta(seconds=task_info.timeout)}",
+        # f"▫️ Время окончания действия номера: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + datetime.timedelta(seconds=task_info.timeout)}",
         f"▫️ Статуc: {status}",
         f"▫️ Содержание сообщении: {task_info.msg}"
     ]

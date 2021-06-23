@@ -36,7 +36,7 @@ class OnlineSIM:
 
         _result = {}
         for country_code, country in parsed.items():
-            if country["visible"] == 1 and await self.summary_numbers_count(country_code) != 0:
+            if country["visible"] == 1:   # and await self.summary_numbers_count(country_code) != 0:
                 _result.update({country_code: country["rus"]})
         return _result
 
@@ -154,9 +154,12 @@ class OnlineSIM:
                 response = await self.stateOne(tzid)
                 ic("Make pool")
 
-                if "msg" in response and response["msg"] != __response_msg and response["msg"] is not False:
+                if "msg" in response[0] and response[0]["msg"] != __response_msg and response[0]["msg"] is not False:
                     ic("New message found")
-                    __response_msg = response["msg"]
+                    _rsp_msg = []
+                    for message in response[0]["msg"]:
+                        _rsp_msg.append(message["msg"])
+                    __response_msg = "\n".join(_rsp_msg)
                     __last_code = (tzid, __response_msg, OnlinesimStatus.waiting)
                     ic(__response_msg)
                     ic(type(__response_msg))
