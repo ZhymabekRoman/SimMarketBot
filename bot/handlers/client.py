@@ -26,11 +26,18 @@ service_cb = CallbackData("service", "country_code", "service_code")
 buy_number_cb = CallbackData("buy_service_number", "country_code", "service_code", "price")
 task_manager_cb = CallbackData("task_manager", "tzid")
 cancel_task_cb = CallbackData("cancel_task", "tzid")
+paymemt_method_cb = CallbackData("paymemt_method", "amount")
+refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
 
 
 class ReciveSMS(StatesGroup):
     waiting_country = State()
     waiting_service = State()
+
+
+class PaymentMethod(StatesGroup):
+    waiting_amount = State()
+    waiting_method = State()
 
 
 # Проверяем на существование текущего пользывателя в БД
@@ -338,8 +345,10 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         await call.answer("Что-то пошло не так", True)
 
 
-@dp.callback_query_handler(text="balance")
-async def balance_message(call: types.CallbackQuery):
+@dp.callback_query_handler(text="balance", state='*')
+async def balance_message(call: types.CallbackQuery, state: FSMContext):
+    await state.finish()
+
     user_balance = User.where(user_id=call.message.chat.id).first().balance
 
     keyboard = types.InlineKeyboardMarkup()
@@ -384,24 +393,83 @@ async def refill_history_message(call: types.CallbackQuery):
     await call.answer()
 
 
-@dp.callback_query_handler(text='refill_balance')
+@dp.callback_query_handler(text='refill_balance', state='*')
 async def refill_balance_message(call: types.CallbackQuery):
-    keyboard = types.InlineKeyboardMarkup()
-    qiwi_btn = types.InlineKeyboardButton("QIWI", callback_data="refill_balance_via_qiwi")
+    keyboard = types.InlineKeyboardMarkup(row_width=3)
+    amounts_list = [50, 100, 250, 500, 1000, 5000]
+    amount_btn_list = []
+
+    for amount in amounts_list:
+        amount_btn = types.InlineKeyboardButton(amount, callback_data=paymemt_method_cb.new(amount))
+        amount_btn_list.append(amount_btn)
+
+    message_text = [
+        "Вы можете пополнить сумму ниже через кнопку, либо введите желаемую сумму:",
+        "",
+        "Пример: 100"
+    ]
+
     back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
+    keyboard.add(*amount_btn_list)
+    keyboard.add(back_btn)
+    await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard)
+    await call.answer()
+    await PaymentMethod.waiting_amount.set()
+
+
+@dp.callback_query_handler(paymemt_method_cb.filter(), state=PaymentMethod.waiting_amount)
+async def refill_balance_amount_callback(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    amount = callback_data.get("amount", 700)
+
+    await state.update_data({"amount": amount})
+
+    await refill_balance_method_message(call.message, state, "edit")
+    await call.answer()
+
+
+@dp.message_handler(state=PaymentMethod.waiting_amount, content_types=types.ContentTypes.TEXT)
+async def refill_balance_amount_message(msg: types.Message, state: FSMContext):
+    amount = msg.text
+
+    if not amount.isdigit():
+        keyboard = types.InlineKeyboardMarkup()
+        back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
+        keyboard.add(back_btn)
+        await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption="Баланс пользывателя должен быть в цифрах", reply_markup=keyboard)
+        return
+
+    await state.update_data({"amount": amount})
+
+    await refill_balance_method_message(msg, state, "answer")
+
+
+@dp.message_handler(state=PaymentMethod.waiting_method, content_types=types.ContentTypes.TEXT)
+async def refill_balance_method_message(msg: types.Message, state: FSMContext, msg_type: str = "answer"):
+    user_data = await state.get_data()
+    amount = int(user_data.get("amount", 700))
+
+    keyboard = types.InlineKeyboardMarkup()
+    qiwi_btn = types.InlineKeyboardButton("QIWI", callback_data=refill_balance_via_cb.new(amount=amount, method="qiwi"))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data="refill_balance")
     keyboard.add(qiwi_btn)
     keyboard.add(back_btn)
     message_text = [
         "Выберите один из способов пополнения",
         f"Если они вам по какой-то причине не подходят, то вы можете написать админу: {config.ADMIN_USERNAME}"
     ]
-    await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard)
-    await call.answer()
+    if msg_type == "edit":
+        await msg.edit_caption('\n'.join(message_text), reply_markup=keyboard)
+    elif msg_type == "answer":
+        await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption='\n'.join(message_text), reply_markup=keyboard)
+
+    await PaymentMethod.waiting_method.set()
 
 
-@dp.callback_query_handler(text='refill_balance_via_qiwi')
-async def refill_balance_via_qiwi_message(call: types.CallbackQuery):
-    qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, 750.0, call.message.chat.id, 643, ["account", "comment"], 0)
+@dp.callback_query_handler(refill_balance_via_cb.filter(method=["qiwi"]), state=PaymentMethod.waiting_method)
+async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    amount = int(callback_data.get("amount", 700))
+
+    qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, call.message.chat.id, 643, ["account", "comment"], 0)
 
     keyboard = types.InlineKeyboardMarkup()
     payement_qiwi_btn = types.InlineKeyboardButton("Перейти к оплате", qiwi_payment_link)
@@ -420,6 +488,8 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery):
     ]
     await call.message.edit_caption('\n'.join(message_text), parse_mode=types.ParseMode.MARKDOWN, reply_markup=keyboard)
     await call.answer()
+
+    await state.finish()
 
 
 @dp.callback_query_handler(text="partners")

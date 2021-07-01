@@ -51,7 +51,7 @@ async def admin_panel_message(message: types.Message, msg_type="answer"):
 
     message_text = [
         "Админ панель",
-        f"Общее количество пользывателей: {len(_users)}",
+        f"Общее количество пользователей: {len(_users)}",
         f"Общии баланс в боте: {_all_balance}"
     ]
     if msg_type == "answer":
@@ -60,7 +60,7 @@ async def admin_panel_message(message: types.Message, msg_type="answer"):
         await message.edit_text('\n'.join(message_text), reply_markup=keyboard)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'change_user_balance', state='*')
+@dp.callback_query_handler(text='change_user_balance', state='*')
 async def change_user_balance_message(call: types.CallbackQuery):
     await call.message.edit_text("Отправьте ID юзера: ", reply_markup=await generate_back_keyboard())
     await ChangeBalance.waiting_user_id.set()
@@ -80,7 +80,6 @@ async def change_user_balance_step1_message(message: types.Message, state: FSMCo
 
     if not user:
         await message.reply("Такого пользывателя нету, попробуйте еще раз", reply_markup=await generate_back_keyboard())
-        # await ChangeBalance.waiting_user_id.set()
         return
 
     await message.reply(f"Отлично, а теперь введите пожалуйста новую сумму баланса. В данное время баланс пользывателя: {user.balance}", reply_markup=await generate_back_keyboard())
@@ -107,7 +106,7 @@ async def change_user_balance_step2_message(message: types.Message, state: FSMCo
     await message.reply("Баланс успешно изменен!", reply_markup=await generate_back_keyboard())
 
 
-@dp.callback_query_handler(lambda c: c.data == 'make_mailing', state='*')
+@dp.callback_query_handler(text='make_mailing', state='*')
 async def make_mailing_message(call: types.CallbackQuery):
     await call.message.edit_text("Отправьте мне сообщение которое вы хотите разослать всем пользывателям:", reply_markup=await generate_back_keyboard())
     await SendMailing.waiting_message_to_mailing.set()
@@ -129,7 +128,7 @@ async def send_mailing_message(message: types.Message, state: FSMContext):
     await message.answer("Это предварительный просмотр сообщении. Вы действительно хотите это разослать всем пользывателям?", reply_markup=keyboard)
 
 
-@dp.callback_query_handler(lambda c: c.data == "confirm_mailing", state=SendMailing.waiting_message_to_mailing)
+@dp.callback_query_handler(text="confirm_mailing", state=SendMailing.waiting_message_to_mailing)
 async def mailing_message(call: types.CallbackQuery, state: FSMContext):
 
     async with state.proxy() as user_data:
