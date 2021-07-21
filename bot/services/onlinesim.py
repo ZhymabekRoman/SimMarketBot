@@ -73,7 +73,6 @@ class OnlineSIM:
 
     async def buy_number(self, service_code: int, country_code: int):
         url = "https://onlinesim.ru/api/getNum.php"
-        # url = "https://onlinesim.ru/demo/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
 
         async with self.session.get(url=url, params=params) as response:
@@ -154,17 +153,18 @@ class OnlineSIM:
                 response = await self.stateOne(tzid)
                 ic("Make pool")
 
-                if "msg" in response[0] and response[0]["msg"] != __response_msg and response[0]["msg"] is not False:
-                    ic("New message found")
-                    _rsp_msg = []
+                # if response[0].get("msg", None) and response[0]["msg"] != __response_msg and response[0]["msg"] is not False:
+                _rsp_msg = []
+                if response[0].get("msg", None):
+                    ic("messages found!")
                     for message in response[0]["msg"]:
                         _rsp_msg.append(message["msg"])
-                    __response_msg = "\n".join(_rsp_msg)
-                    __last_code = (tzid, __response_msg, OnlinesimStatus.waiting)
-                    ic(__response_msg)
-                    ic(type(__response_msg))
-                    await callback(__last_code)
-                    await self.next(tzid)
+                    # __response_msg = "\n".join(_rsp_msg)
+                __response_msg = _rsp_msg
+                __last_code = (tzid, __response_msg, OnlinesimStatus.waiting)
+                ic(__response_msg)
+                await callback(__last_code)
+                await self.next(tzid)
 
         except asyncio.CancelledError:
             ic("Close task")

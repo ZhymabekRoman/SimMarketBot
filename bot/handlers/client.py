@@ -291,7 +291,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     service = services_list.get(task_info.service_code)
     country = countries_list.get(task_info.country_code)
 
-    expirity = 0
+    # expirity = 0
 
     if task_info.status == OnlinesimStatus.waiting:
         status = "Активен"
@@ -308,11 +308,15 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     if task_info.status == OnlinesimStatus.waiting:
         cancel_task_btn = types.InlineKeyboardButton("Отменить / завершить операцию", callback_data=cancel_task_cb.new(tzid))
         keyboard.add(cancel_task_btn)
+    update_btn = types.InlineKeyboardButton("Обновить", callback_data=task_manager_cb.new(tzid))
     black_btn = types.InlineKeyboardButton("Назад", callback_data="active_tasks")
+    keyboard.add(update_btn)
     keyboard.add(black_btn)
 
     # TODO: Implement
     # expirity = readable_timedelta((task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + task_info.timeout) - datetime.datetime.now(pytz.timezone('Europe/Moscow')).timestamp())
+
+    msg = '\n'.join(task_info.msg.get("msg", []))
 
     message_text = [
         f"▫️ ID опреации: {task_info.tzid}",
@@ -324,10 +328,14 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ Длительность действия номера: {task_info.timeout} секунд",
         # f"▫️ Время окончания действия номера: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + datetime.timedelta(seconds=task_info.timeout)}",
         f"▫️ Статуc: {status}",
-        f"▫️ Содержание сообщении: {task_info.msg}"
+        "▫️ Сообщения:",
+        f"<code>{msg}</code>"
     ]
 
-    await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard)
+    try:
+        await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard, parse_mode=types.ParseMode.HTML)
+    except Exception:
+        pass
     await call.answer()
 
 
@@ -504,7 +512,7 @@ async def check_referrals(call: types.CallbackQuery):
     bot_username = (await call.bot.me).username
     bot_link = f"https://t.me/{bot_username}?start={call.message.chat.id}"
     _frwd_telegram_url = "https://t.me/share/url"
-    _frwd_telegram_params = {"url": bot_link, "text": "SimMarketBot - сервис для приёма SMS сообщений"}
+    _frwd_telegram_params = {"url": bot_link, "text": "ActiVision - сервис для приёма SMS сообщений"}
     _frwd_telegram_req = PreparedRequest()
     _frwd_telegram_req.prepare_url(_frwd_telegram_url, _frwd_telegram_params)
     forward_url = _frwd_telegram_req.url
