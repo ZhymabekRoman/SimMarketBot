@@ -1,8 +1,11 @@
-# TODO: Implement
+from icecream import ic
+
 
 def readable_timedelta(duration):
-    # if duration < 0:
-    #     return "0 секунд"
+    ic(duration)
+    if duration.total_seconds() < 0:
+        return "0 секунд"
+
     data = {}
     data['дней'], remaining = divmod(duration, 86_400)
     data['часов'], remaining = divmod(remaining, 3_600)
@@ -13,4 +16,4 @@ def readable_timedelta(duration):
     if time_parts:
         return ' '.join(time_parts)
     else:
-        return 'below 1 second'
+        return 'меньше 1 секунды'

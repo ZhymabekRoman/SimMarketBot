@@ -214,11 +214,17 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         await call.answer("Извините, что-то пошло не так", True)
         return
 
-    service_status = await sim_service.run_waiting_code_task(tzid, service_code)
+    try:
+        service_status = await sim_service.run_waiting_code_task(tzid, service_code)
+    except Exception:
+        await call.answer("Извините, что-то пошло не так", True)
+        return
 
     ic(service_status)
 
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status["number"], timeout=service_status["time"])
+    end_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')) + datetime.timedelta(seconds=service_status["time"] - 10)
+
+    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status["number"], end_date=end_date)
     user.update(balance=user_balance - service_price)
     if user.reffer_id is not None:
         _referral_amount = 0.25
@@ -291,8 +297,6 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     service = services_list.get(task_info.service_code)
     country = countries_list.get(task_info.country_code)
 
-    # expirity = 0
-
     if task_info.status == OnlinesimStatus.waiting:
         status = "Активен"
     elif task_info.status == OnlinesimStatus.success:
@@ -313,22 +317,22 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     keyboard.add(update_btn)
     keyboard.add(black_btn)
 
-    # TODO: Implement
-    # expirity = readable_timedelta((task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + task_info.timeout) - datetime.datetime.now(pytz.timezone('Europe/Moscow')).timestamp())
+    expirity = readable_timedelta(datetime.timedelta(seconds=task_info.end_date.timestamp() - datetime.datetime.now(pytz.timezone('Europe/Moscow')).timestamp()))
 
-    msg = '\n'.join(task_info.msg.get("msg", []))
+    msg_raw = task_info.msg.get("msg", [])
+    msg = '\n'.join(msg_raw)
 
     message_text = [
-        f"▫️ ID опреации: {task_info.tzid}",
+        f"▫️ ID опреации: {task_info.id}",
         f"▫️ Номер телефона: {task_info.number}",
         f"▫️ Страна: {country}",
         f"▫️ Сервис: {service['service']}",
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
-        f"▫️ Длительность действия номера: {task_info.timeout} секунд",
-        # f"▫️ Время окончания действия номера: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow')).timestamp() + datetime.timedelta(seconds=task_info.timeout)}",
+        f"▫️ Длительность действия номера: {expirity}",
+        f"▫️ Время окончания действия номера: {task_info.end_date}"
         f"▫️ Статуc: {status}",
-        "▫️ Сообщения:",
+        f"▫️ Сообщения ({len(msg_raw)}):",
         f"<code>{msg}</code>"
     ]
 
@@ -344,10 +348,17 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     tzid = int(callback_data["tzid"])
     task = sim_service.tasks.get(tzid)
 
+    task_info = Onlinesim.where(tzid=tzid).first()
+
+    if not task_info.msg:
+        user = User.where(user_id=call.message.chat.id).first()
+        user.update(balance=user.balqnce + task_info.price)
+
     try:
         task.cancel()
     except asyncio.CancelledError:
-        await asyncio.sleep(2)
+        ic("Exception 1")
+        await asyncio.sleep(3)
         await task_manager_message(call, callback_data)
     except Exception:
         await call.answer("Что-то пошло не так", True)

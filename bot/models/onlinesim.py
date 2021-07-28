@@ -14,11 +14,12 @@ class OnlinesimStatus(enum.Enum):
 class Onlinesim(BaseModel):
     __tablename__ = 'onlinesim'
 
-    tzid = sa.Column(sa.Integer, nullable=False, unique=True, primary_key=True, index=True)
+    id = sa.Column(sa.Integer, unique=True, primary_key=True, autoincrement=True)
+    tzid = sa.Column(sa.Integer, nullable=False, index=True)
     user_id = sa.Column(sa.Integer, sa.ForeignKey('users.user_id'))
     number = sa.Column(sa.Text)
     price = sa.Column(sa.Float, nullable=False)
-    timeout = sa.Column(sa.Integer)
+    end_date = sa.Column(sa.DateTime(timezone=True))
     service_code = sa.Column(sa.Text, nullable=False)
     country_code = sa.Column(sa.Text, nullable=False)
     status = sa.Column(sa.Enum(OnlinesimStatus), default=OnlinesimStatus.waiting)

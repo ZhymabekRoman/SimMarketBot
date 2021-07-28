@@ -15,11 +15,13 @@ from icecream import ic
 class OnlineSIM:
     _cache = LRUDictCache()
 
-    def __init__(self, api_key, loop):
+    def __init__(self, api_key, loop, demo=False):
         self.__api_key = api_key
         self.session = aiohttp.ClientSession()
         self.tasks = {}
         self.loop = loop
+        self.lock = asyncio.Lock()
+        self.demo = demo
 
     async def countries_list(self):
         url = "http://api-conserver.onlinesim.ru/stubs/handler_api.php"
@@ -31,8 +33,8 @@ class OnlineSIM:
             async with self.session.get(url=url, params=params) as response:
                 result = await response.text()
                 parsed = json.loads(result)
-
-            self._cache["countries_list"] = parsed
+            async with self.lock:
+                self._cache["countries_list"] = parsed
 
         _result = {}
         for country_code, country in parsed.items():
@@ -51,8 +53,8 @@ class OnlineSIM:
             async with self.session.get(url=url, params=params) as response:
                 result = await response.text()
                 parsed = json.loads(result)
-
-            self._cache[_cache_key] = parsed
+            async with self.lock:
+                self._cache[_cache_key] = parsed
 
         _result = {}
         for _, service in parsed["services"].items():
@@ -72,7 +74,10 @@ class OnlineSIM:
         return _result
 
     async def buy_number(self, service_code: int, country_code: int):
-        url = "https://onlinesim.ru/api/getNum.php"
+        if self.demo is True:
+            url = "https://onlinesim.ru/demo/api/getNum.php"
+        else:
+            url = "https://onlinesim.ru/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
 
         async with self.session.get(url=url, params=params) as response:
@@ -90,16 +95,18 @@ class OnlineSIM:
         self,
         tzid: int,
         message_to_code: int = 0,
-        msg_list: bool = 1,
-        clean: bool = 0,
+        msg_list: bool = 0,
+        clean: bool = 1,
         repeat: bool = 0,
     ):
         type = "index"
         if repeat:
             type = "repeat"
 
-        # url = "https://onlinesim.ru/demo/api/getState.php"
-        url = "https://onlinesim.ru/api/getState.php"
+        if self.demo is True:
+            url = "https://onlinesim.ru/demo/api/getState.php"
+        else:
+            url = "https://onlinesim.ru/api/getState.php"
         params = {
             "apikey": self.__api_key,
             "tzid": tzid,
@@ -123,6 +130,8 @@ class OnlineSIM:
             if _service["service"].lower() == service.lower():
                 service_stat = _service
                 break
+        else:
+            raise
 
         waiting_code_task = self.loop.create_task(self.wait_code(tzid, service_stat["time"] - 10, callback))
         self.tasks[tzid] = waiting_code_task
@@ -130,62 +139,41 @@ class OnlineSIM:
         return service_stat
 
     async def wait_code(self, tzid: int, timeout: int, callback, not_end=False):
-        __response_msg = None
-        __last_code = (tzid, __response_msg, OnlinesimStatus.error)
+        __response_msg = []
+        __status = OnlinesimStatus.waiting
 
         end_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')) + datetime.timedelta(seconds=timeout)
 
-        try:
-            while True:
-                await asyncio.sleep(10)
+        while True:
+            try:
+                await asyncio.sleep(8)
 
                 if end_date < datetime.datetime.now(pytz.timezone('Europe/Moscow')):
-                    if __response_msg is None:
-                        __status = OnlinesimStatus.expire
-                    else:
-                        __status = OnlinesimStatus.success
-                    __last_code = (tzid, __response_msg, __status)
-                    await callback(__last_code)
-                    await self.close(tzid)
-                    del self.tasks[tzid]
-                    break
+                    raise
 
                 response = await self.stateOne(tzid)
-                ic("Make pool")
 
-                # if response[0].get("msg", None) and response[0]["msg"] != __response_msg and response[0]["msg"] is not False:
-                _rsp_msg = []
                 if response[0].get("msg", None):
-                    ic("messages found!")
                     for message in response[0]["msg"]:
-                        _rsp_msg.append(message["msg"])
-                    # __response_msg = "\n".join(_rsp_msg)
-                __response_msg = _rsp_msg
-                __last_code = (tzid, __response_msg, OnlinesimStatus.waiting)
-                ic(__response_msg)
-                await callback(__last_code)
+                        __response_msg.append(message["msg"])
+
+                await asyncio.sleep(2)
+
                 await self.next(tzid)
 
-        except asyncio.CancelledError:
-            ic("Close task")
-            if __response_msg is None:
-                __status = OnlinesimStatus.cancel
-            else:
-                __status = OnlinesimStatus.success
-            __last_code = (tzid, __response_msg, OnlinesimStatus.cancel)
-            await callback(__last_code)
-            await self.close(tzid)
-            del self.tasks[tzid]
-            raise
-        except Exception:
-            await callback(__last_code)
-            del self.tasks[tzid]
-            await self.close(tzid)
-        # finally:
-        #     if callback:
-        #         await callback(__last_code)
-
-        #     return __last_code
+            except Exception:
+                ic("Exception 2")
+                if __response_msg:
+                    __status = OnlinesimStatus.success
+                else:
+                    __status = OnlinesimStatus.cancel
+                del self.tasks[tzid]
+                await self.close(tzid)
+                raise
+            finally:
+                __event_response = (tzid, __response_msg, __status)
+                if callback:
+                    await callback(__event_response)
 
     async def next(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationRevise"
@@ -202,7 +190,10 @@ class OnlineSIM:
         return parsed
 
     async def close(self, tzid: int):
-        url = "https://onlinesim.ru/api/setOperationOk"
+        if self.demo is True:
+            url = "https://onlinesim.ru/demo/api/setOperationOk"
+        else:
+            url = "https://onlinesim.ru/api/setOperationOk"
         params = {
             "apikey": self.__api_key,
             "tzid": tzid
