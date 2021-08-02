@@ -205,7 +205,7 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         await call.answer("У вас недостаточно средств для покупки", True)
         return
 
-    status, tzid = await sim_service.buy_number(service_code, country_code)
+    status, tzid = await sim_service.getNum(service_code, country_code)
 
     if status == "NO_NUMBER":
         await call.answer("Извините, номера закончились", True)
@@ -215,16 +215,12 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         return
 
     try:
-        service_status = await sim_service.run_waiting_code_task(tzid, service_code)
+        service_status = await sim_service.getState(tzid)
     except Exception:
         await call.answer("Извините, что-то пошло не так", True)
         return
 
-    ic(service_status)
-
-    end_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')) + datetime.timedelta(seconds=service_status["time"] - 10)
-
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status["number"], end_date=end_date)
+    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status.get('number'))
     user.update(balance=user_balance - service_price)
     if user.reffer_id is not None:
         _referral_amount = 0.25
@@ -254,7 +250,7 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
             service = services_list.get(task.service_code)
             country = countries_list.get(task.country_code)
 
-            task_btn = types.InlineKeyboardButton(f"{task.tzid} | {service['service']} | {country}", callback_data=task_manager_cb.new(task.tzid))
+            task_btn = types.InlineKeyboardButton(f"{task.id} | {service['service']} | {country}", callback_data=task_manager_cb.new(task.tzid))
             keyboard.add(task_btn)
 
     active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data="active_tasks")
@@ -285,11 +281,26 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
 async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     tzid = int(callback_data["tzid"])
 
+    task = await sim_service.getState(tzid)
     task_info = Onlinesim.where(tzid=tzid).first()
 
     if not task_info:
         await call.answer("Извините, что-то пошло не так", True)
         return
+
+    if task:
+        msg_raw = []
+
+        for _msg in task.get("msg", []):
+            __received_msg = _msg.get("msg", "")
+            msg_raw.append(__received_msg)
+
+        time = task.get("time", 0)
+        number = task.get('number')
+    else:
+        msg_raw = task_info.msg.get("msg")
+        time = 0
+        number = task_info.number
 
     countries_list = await sim_service.countries_list()
     services_list = await sim_service.number_stats(task_info.country_code)
@@ -298,39 +309,34 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     country = countries_list.get(task_info.country_code)
 
     if task_info.status == OnlinesimStatus.waiting:
-        status = "Активен"
+        status = "Активно"
     elif task_info.status == OnlinesimStatus.success:
         status = "Успешно"
     elif task_info.status == OnlinesimStatus.expire:
         status = "Истекло время ожидании"
     elif task_info.status == OnlinesimStatus.cancel:
         status = "Отменена"
-    elif task_info.status == OnlinesimStatus.error:
-        status = "Ошибка"
 
     keyboard = types.InlineKeyboardMarkup()
     if task_info.status == OnlinesimStatus.waiting:
-        cancel_task_btn = types.InlineKeyboardButton("Отменить / завершить операцию", callback_data=cancel_task_cb.new(tzid))
+        cancel_task_btn = types.InlineKeyboardButton("Отменить / Завершить операцию", callback_data=cancel_task_cb.new(tzid))
         keyboard.add(cancel_task_btn)
-    update_btn = types.InlineKeyboardButton("Обновить", callback_data=task_manager_cb.new(tzid))
+        update_btn = types.InlineKeyboardButton("Обновить", callback_data=task_manager_cb.new(tzid))
+        keyboard.add(update_btn)
     black_btn = types.InlineKeyboardButton("Назад", callback_data="active_tasks")
-    keyboard.add(update_btn)
     keyboard.add(black_btn)
 
-    expirity = readable_timedelta(datetime.timedelta(seconds=task_info.end_date.timestamp() - datetime.datetime.now(pytz.timezone('Europe/Moscow')).timestamp()))
-
-    msg_raw = task_info.msg.get("msg", [])
+    expirity = readable_timedelta(datetime.timedelta(seconds=time))
     msg = '\n'.join(msg_raw)
 
     message_text = [
         f"▫️ ID опреации: {task_info.id}",
-        f"▫️ Номер телефона: {task_info.number}",
+        f"▫️ Номер телефона: {number}",
         f"▫️ Страна: {country}",
         f"▫️ Сервис: {service['service']}",
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
         f"▫️ Длительность действия номера: {expirity}",
-        f"▫️ Время окончания действия номера: {task_info.end_date}"
         f"▫️ Статуc: {status}",
         f"▫️ Сообщения ({len(msg_raw)}):",
         f"<code>{msg}</code>"
@@ -342,26 +348,55 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         pass
     await call.answer()
 
+    try:
+        service_response = task.get("response")
+    except Exception:
+        service_response = None
+
+    if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:
+        await cancel_task_message(call, callback_data)
+    else:
+        await sim_service.setOperationRevise(tzid)
+
 
 @dp.callback_query_handler(cancel_task_cb.filter())
 async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     tzid = int(callback_data["tzid"])
-    task = sim_service.tasks.get(tzid)
 
+    task = await sim_service.getState(tzid)
     task_info = Onlinesim.where(tzid=tzid).first()
 
-    if not task_info.msg:
-        user = User.where(user_id=call.message.chat.id).first()
-        user.update(balance=user.balqnce + task_info.price)
+    # if close_task_info.get("response") != "1":
+    #     await call.answer("Извините, операцию нельзя завершить сейчас, попробуйте чуть позже", True)
+    #     return
 
-    try:
-        task.cancel()
-    except asyncio.CancelledError:
-        ic("Exception 1")
-        await asyncio.sleep(3)
-        await task_manager_message(call, callback_data)
-    except Exception:
-        await call.answer("Что-то пошло не так", True)
+    if not task.get("msg"):
+        user = User.where(user_id=call.message.chat.id).first()
+        user.update(balance=user.balance + task_info.price)
+
+    msg_raw = []
+    for _msg in task.get("msg", []):
+        __received_msg = _msg.get("msg", "")
+        msg_raw.append(__received_msg)
+
+    service_response = task.get("response")
+    ic(service_response)
+
+    if service_response in ["TZ_OVER_OK", "TZ_NUM_ANSWER"]:
+        _task_status = OnlinesimStatus.success
+    elif service_response == "TZ_NUM_WAIT":
+        _task_status = OnlinesimStatus.cancel
+    elif service_response == "TZ_OVER_EMPTY":
+        _task_status = OnlinesimStatus.expire
+    else:
+        ic(f"Unknown task status: {service_response}")
+        _task_status = OnlinesimStatus.cancel
+
+    task_info.update(msg={"msg": msg_raw}, status=_task_status)
+
+    close_task_info = await sim_service.setOperationOk(tzid)
+    await task_manager_message(call, callback_data)
+    # await call.answer("Задача успешно отменена")
 
 
 @dp.callback_query_handler(text="balance", state='*')
@@ -382,9 +417,6 @@ async def balance_message(call: types.CallbackQuery, state: FSMContext):
         f"🏷 Ваш id: `{call.message.chat.id}`",
         ""
     ]
-    # if msg_type == "answer":
-    #     await call.message.reply('\n'.join(message_text), reply_markup=keyboard, parse_mode=types.ParseMode.MARKDOWN)
-    # elif msg_type == "edit":
     await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard, parse_mode=types.ParseMode.MARKDOWN)
     await call.answer()
 
