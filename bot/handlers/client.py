@@ -12,6 +12,7 @@ from bot.utils.qiwi import generate_qiwi_payment_form_link
 from bot.utils.timedelta import readable_timedelta
 
 import os
+import re
 import asyncio
 import pytz
 import datetime
@@ -208,7 +209,7 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     status, tzid = await sim_service.getNum(service_code, country_code)
 
     if status == "NO_NUMBER":
-        await call.answer("Извините, номера закончились", True)
+        await call.answer("Извините, оказывается номера уже закончились", True)
         return
     elif status != 1:
         await call.answer("Извините, что-то пошло не так", True)
@@ -327,7 +328,14 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     keyboard.add(black_btn)
 
     expirity = readable_timedelta(datetime.timedelta(seconds=time))
-    msg = '\n'.join(msg_raw)
+
+    msg = []
+    for _msg in msg_raw:
+        finded_numbered_words = re.findall(r"\b(\d+)\b", _msg)
+        for numbered_word in finded_numbered_words:
+            _msg = re.sub(r'\b%s\b' % numbered_word, f'<code>{numbered_word}</code>', _msg)
+        msg.append(_msg)
+    msg = '\n'.join(msg)
 
     message_text = [
         f"▫️ ID опреации: {task_info.id}",
@@ -339,7 +347,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ Длительность действия номера: {expirity}",
         f"▫️ Статуc: {status}",
         f"▫️ Сообщения ({len(msg_raw)}):",
-        f"<code>{msg}</code>"
+        f"{msg}"
     ]
 
     try:
@@ -520,7 +528,9 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
 async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     amount = int(callback_data.get("amount", 700))
 
-    qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, call.message.chat.id, 643, ["account", "comment"], 0)
+    # qiwi_payment_comment = f"ActiVision-{call.message.chat.id}"
+    qiwi_payment_comment = call.message.chat.id
+    qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, qiwi_payment_comment, 643, ["account", "comment"], 0)
 
     keyboard = types.InlineKeyboardMarkup()
     payement_qiwi_btn = types.InlineKeyboardButton("Перейти к оплате", qiwi_payment_link)
@@ -533,7 +543,7 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_da
         "▫️ Для пополнения баланса переведите нужную сумму на",
         f"▫️ Qiwi кошелек: `{config.QIWI_WALLET}`",
         "❗️ В комментарии платежа ОБЯЗАТЕЛЬНО укажите:",
-        f'`{call.message.chat.id}`',
+        f'`{qiwi_payment_comment}`',
         "▫️ Деньги зачисляться автоматически в течении 2 минут",
         "▫️ Вы получите уведомление в боте"
     ]
@@ -584,7 +594,11 @@ async def check_referrals(call: types.CallbackQuery):
 @dp.callback_query_handler(text="information")
 async def information_message(call: types.CallbackQuery):
     keyboard = types.InlineKeyboardMarkup()
+    tech_support_btn = types.InlineKeyboardButton("👨‍💻 Техподдержка / Администратор", "https://t.me/SanjarDS")
+    news_btn = types.InlineKeyboardButton("📢 Новости", "https://t.me/ActiVisioNews")
     back_btn = types.InlineKeyboardButton("Назад", callback_data="main")
+    keyboard.add(tech_support_btn)
+    keyboard.add(news_btn)
     keyboard.add(back_btn)
     message_text = [
         "ActiVision - уникальный сервис для приёма SMS сообщений",
