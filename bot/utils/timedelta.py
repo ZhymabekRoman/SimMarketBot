@@ -1,9 +1,5 @@
-from icecream import ic
-
 
 def readable_timedelta(duration):
-    ic(duration)
-
     data = {}
     data['дней'], remaining = divmod(duration.total_seconds(), 86_400)
     data['часов'], remaining = divmod(remaining, 3_600)

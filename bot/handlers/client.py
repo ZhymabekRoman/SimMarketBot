@@ -13,7 +13,6 @@ from bot.utils.timedelta import readable_timedelta
 
 import os
 import re
-import asyncio
 import pytz
 import datetime
 import math
@@ -93,8 +92,8 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     countries_btn_list = []
     for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
         summary_numbers = await sim_service.summary_numbers_count(country_code)
-        # if summary_numbers == 0:
-        #     continue
+        if summary_numbers == 0:
+            continue
         country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=countries_services_cb.new(1, country_code))
         # country_btn = types.InlineKeyboardButton(country_name, callback_data=countries_services_cb.new(1, country_code))
         countries_btn_list.append(country_btn)
@@ -165,8 +164,6 @@ async def countries_services_message(call: types.CallbackQuery, callback_data: d
 async def service_message(call: types.CallbackQuery, callback_data: dict):
     country_code = callback_data["country_code"]
     service_code = callback_data["service_code"]
-
-    ic(service_code)
 
     countries_list = await sim_service.countries_list()
     services_list = await sim_service.number_stats(country_code)

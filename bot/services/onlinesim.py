@@ -1,15 +1,11 @@
 import json
 import aiohttp
-import datetime
 import asyncio
-import pytz
 
-# from bot.services.scheduler import scheduler
-from bot.events.onlinesim import onlinesim_msg_code_event  # , onlinesim_close_operation
-from bot.models.onlinesim import OnlinesimStatus
 from bot.utils.lru_cacher import LRUDictCache
 
 from icecream import ic
+import traceback
 
 
 class OnlineSIM:
@@ -47,6 +43,7 @@ class OnlineSIM:
 
         _cache_key = str({"number_stats": country_code})
         if _cache_key in self._cache:
+            ic("Using cached values!")
             parsed = self._cache[_cache_key]
         else:
             async with self.session.get(url=url, params=params) as response:
@@ -56,9 +53,15 @@ class OnlineSIM:
                 self._cache[_cache_key] = parsed
 
         _result = {}
-        for _, service in parsed["services"].items():
-            if service["count"] != 0:
-                _result.update({service["slug"]: service})
+        try:
+            for _, service in parsed["services"].items():
+                if service["count"] != 0:
+                    _result.update({service["slug"]: service})
+        except Exception:
+            ic("Exception was interrupted in number_stats function")
+            traceback.print_exc()
+            ic(country_code)
+            ic(parsed)
 
         return _result
 
