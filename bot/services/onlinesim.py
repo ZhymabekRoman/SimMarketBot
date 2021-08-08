@@ -11,12 +11,11 @@ import traceback
 class OnlineSIM:
     _cache = LRUDictCache()
 
-    def __init__(self, api_key, loop, demo=False):
+    def __init__(self, api_key, loop):
         self.__api_key = api_key
         self.session = aiohttp.ClientSession()
         self.loop = loop
         self.lock = asyncio.Lock()
-        # self.demo = demo
 
     async def countries_list(self):
         url = "http://api-conserver.onlinesim.ru/stubs/handler_api.php"
@@ -43,7 +42,6 @@ class OnlineSIM:
 
         _cache_key = str({"number_stats": country_code})
         if _cache_key in self._cache:
-            ic("Using cached values!")
             parsed = self._cache[_cache_key]
         else:
             async with self.session.get(url=url, params=params) as response:
@@ -76,9 +74,6 @@ class OnlineSIM:
         return _result
 
     async def getNum(self, service_code: int, country_code: int):
-        # if self.demo is True:
-        #     url = "https://onlinesim.ru/demo/api/getNum.php"
-        # else:
         url = "https://onlinesim.ru/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
 
@@ -105,9 +100,6 @@ class OnlineSIM:
         if repeat:
             type = "repeat"
 
-        # if self.demo is True:
-        #     url = "https://onlinesim.ru/demo/api/getState.php"
-        # else:
         url = "https://onlinesim.ru/api/getState.php"
         params = {
             "apikey": self.__api_key,
@@ -148,9 +140,6 @@ class OnlineSIM:
         return parsed
 
     async def setOperationOk(self, tzid: int):
-        # if self.demo is True:
-        #     url = "https://onlinesim.ru/demo/api/setOperationOk"
-        # else:
         url = "https://onlinesim.ru/api/setOperationOk.php"
         params = {
             "apikey": self.__api_key,
@@ -161,10 +150,6 @@ class OnlineSIM:
             parsed = json.loads(result)
 
         ic(parsed)
-
-        # if parsed.get("response") == "TRY_AGAIN_LATER":
-        #     ic("Schedule task to close")
-        #     scheduler.add_job(onlinesim_close_operation, "date", id=tzid, run_date=datetime.datetime.utcnow() + datetime.timedelta(minutes=3), kwargs={"tzid": tzid})
 
         return parsed
 

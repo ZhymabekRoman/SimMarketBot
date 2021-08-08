@@ -3,7 +3,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.utils.callback_data import CallbackData
 from aiogram import types
 
-from bot import dp, sim_service
+from bot import bot, dp, sim_service
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.models.onlinesim import Onlinesim, OnlinesimStatus
@@ -40,20 +40,6 @@ class PaymentMethod(StatesGroup):
     waiting_method = State()
 
 
-# Проверяем на существование текущего пользывателя в БД
-# Если не существует тогда регистрируем ID пользывателя в БД (Или можно запросить язык)
-@dp.message_handler(lambda msg: User.where(user_id=msg.chat.id).first() is None)
-async def new_user_message(msg: types.Message):
-    bot_start_arguments = msg.get_args()
-
-    if not bot_start_arguments or not bot_start_arguments.isdigit():
-        reffer = None
-    else:
-        reffer = int(bot_start_arguments)
-    User.create(user_id=msg.chat.id, reffer_id=reffer)
-    await main_menu_message(msg)
-
-
 @dp.callback_query_handler(text="main")
 async def main_menu_btn_message(call: types.CallbackQuery):
     await main_menu_message(call.message, "edit")
@@ -62,6 +48,16 @@ async def main_menu_btn_message(call: types.CallbackQuery):
 
 @dp.message_handler(commands=['start'])
 async def main_menu_message(msg: types.Message, msg_type="answer"):
+    if not User.where(user_id=msg.chat.id).first():
+        bot_start_arguments = msg.get_args()
+        reffer = None
+
+        if bot_start_arguments and bot_start_arguments.isdigit():
+            reffer = int(bot_start_arguments)
+
+        if reffer and User.where(user_id=reffer).first():
+            User.create(user_id=msg.chat.id, reffer_id=reffer)
+
     keyboard = types.InlineKeyboardMarkup()
     sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=buy_cb.new(1))
     all_sms_operations_btn = types.InlineKeyboardButton("📫 Все СМС операции", callback_data="all_operations")
@@ -206,7 +202,11 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     status, tzid = await sim_service.getNum(service_code, country_code)
 
     if status == "NO_NUMBER":
-        await call.answer("Извините, оказывается номера уже закончились", True)
+        await call.answer("Упс, оказывается номера уже закончились", True)
+        return
+    elif status in ["WARNING_LOW_BALANCE"]:
+        await call.answer("Извините, что-то пошло не так", True)
+        await bot.send_message(chat_id=config.ADMIN_ID, text="ТРЕВОГА! У ВАС ПОЧТИ ЗАКОНЧИЛСЯ БАЛАНС В СЕРВИСЕ OnlineSim! СРОЧНО ПОПОЛНИТЕ!!!")
         return
     elif status != 1:
         await call.answer("Извините, что-то пошло не так", True)
@@ -317,9 +317,9 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
 
     keyboard = types.InlineKeyboardMarkup()
     if task_info.status == OnlinesimStatus.waiting:
-        cancel_task_btn = types.InlineKeyboardButton("Отменить / Завершить операцию", callback_data=cancel_task_cb.new(tzid))
+        cancel_task_btn = types.InlineKeyboardButton("📛 Отменить / Завершить операцию", callback_data=cancel_task_cb.new(tzid))
         keyboard.add(cancel_task_btn)
-        update_btn = types.InlineKeyboardButton("Обновить", callback_data=task_manager_cb.new(tzid))
+        update_btn = types.InlineKeyboardButton("♻️ Обновить", callback_data=task_manager_cb.new(tzid))
         keyboard.add(update_btn)
     black_btn = types.InlineKeyboardButton("Назад", callback_data="active_tasks")
     keyboard.add(black_btn)
@@ -525,8 +525,7 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
 async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     amount = int(callback_data.get("amount", 700))
 
-    # qiwi_payment_comment = f"ActiVision-{call.message.chat.id}"
-    qiwi_payment_comment = call.message.chat.id
+    qiwi_payment_comment = f"ActiVision-{call.message.chat.id}"
     qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, qiwi_payment_comment, 643, ["account", "comment"], 0)
 
     keyboard = types.InlineKeyboardMarkup()
@@ -541,7 +540,7 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_da
         f"▫️ Qiwi кошелек: `{config.QIWI_WALLET}`",
         "❗️ В комментарии платежа ОБЯЗАТЕЛЬНО укажите:",
         f'`{qiwi_payment_comment}`',
-        "▫️ Деньги зачисляться автоматически в течении 2 минут",
+        "▫️ Деньги зачисляться автоматически в течении 1 минут",
         "▫️ Вы получите уведомление в боте"
     ]
     await call.message.edit_caption('\n'.join(message_text), parse_mode=types.ParseMode.MARKDOWN, reply_markup=keyboard)

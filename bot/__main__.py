@@ -1,9 +1,9 @@
 from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, currency_converter
-# from bot.services.scheduler import scheduler
 
 from bot.events import qiwi_payment
 from bot.handlers import admin
 from bot.handlers import client
+from bot.handlers import error
 
 from aiogram import Dispatcher, executor
 from aiogram.types import BotCommand
@@ -24,7 +24,6 @@ async def on_bot_startup(dp: Dispatcher):
 
     logger.info("Start QIWI poller ...")
     loop.create_task(qiwi_poller.run_polling())
-    # scheduler.start()
 
 
 async def on_bot_shutdown(dp: Dispatcher):
@@ -32,7 +31,6 @@ async def on_bot_shutdown(dp: Dispatcher):
     await qiwi_wallet.close()
     await sim_service.shutdown()
     await currency_converter.shutdown()
-    # scheduler.shutdown()
 
 
 # Start Telegram bot polling
