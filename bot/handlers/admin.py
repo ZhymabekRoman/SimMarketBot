@@ -138,7 +138,7 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
     await state.finish()
 
     _users = User.all()
-    _mailing_delay_sec = 2
+    _mailing_delay_sec = 0.5
 
     admin_mailing_info = [
         "Рассылка начата!",

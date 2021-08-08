@@ -1,6 +1,7 @@
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 from aiogram.utils.callback_data import CallbackData
+from aiogram.utils.markdown import hlink
 from aiogram import types
 
 from bot import bot, dp, sim_service
@@ -56,7 +57,10 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
             reffer = int(bot_start_arguments)
 
         if reffer and User.where(user_id=reffer).first():
+            await bot.send_message(chat_id=reffer, text=f"По вашей реф. ссылке зарегистрировался {hlink(title=str(msg.chat.id), url=f'tg://user?id={msg.chat.id}')}!", parse_mode=types.ParseMode.HTML)
             User.create(user_id=msg.chat.id, reffer_id=reffer)
+        else:
+            User.create(user_id=msg.chat.id)
 
     keyboard = types.InlineKeyboardMarkup()
     sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=buy_cb.new(1))
