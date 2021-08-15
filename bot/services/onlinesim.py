@@ -2,14 +2,14 @@ import json
 import aiohttp
 import asyncio
 
-from bot.utils.lru_cacher import LRUDictCache
+from bot.utils.json_storager import JSONCacher
 
 from icecream import ic
 import traceback
 
 
 class OnlineSIM:
-    _cache = LRUDictCache()
+    _cache = JSONCacher("bot/user_data/OnlineSIMCacheFile.json")
 
     def __init__(self, api_key, loop):
         self.__api_key = api_key
@@ -155,3 +155,4 @@ class OnlineSIM:
 
     async def shutdown(self):
         await self.session.close()
+        self._cache.shutdown()

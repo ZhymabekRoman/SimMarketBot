@@ -1,4 +1,5 @@
 from aiogram import types
+from aiogram.utils.exceptions import BotBlocked, RetryAfter
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 
@@ -137,33 +138,40 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
     await state.finish()
 
-    _users = User.all()
-    _mailing_delay_sec = 0.5
+    users = User.all()
+    mailing_delay_sec = 1
 
     admin_mailing_info = [
         "Рассылка начата!",
         "",
-        f"Задержка между отправкой рассылки после каждого пользывателя: {_mailing_delay_sec} секунд",
-        f"Общее количество пользывателей: {len(_users)}",
+        f"Задержка между отправкой рассылки после каждого пользователя: {mailing_delay_sec} секунд",
+        f"Общее количество пользывателей: {len(users)}",
         f"Время начала рассылки: {datetime.utcnow()}",
         "Количество успешно отправленных рассылок: {0}",
         "Количество не отправленных рассылок: {1}",
-        f"Время окончания рассылки: примерно в {datetime.utcnow() + timedelta(seconds=_mailing_delay_sec * len(_users))}"
+        "Количество юзеров, заблокировавших бота: {2}"
+        # f"Время окончания рассылки: примерно в {datetime.utcnow() + timedelta(seconds=mailing_delay_sec * len(users))}"
     ]
 
     success_mailing_num = 0
     unsuccess_mailing_num = 0
+    bot_blocked_users_num = 0
 
-    for user in _users:
+    for user in users:
         try:
             await message_to_mailing.send_copy(user.user_id)
-        except Exception:  # BotBlocked:
+        except BotBlocked:
+            bot_blocked_users_num += 1
+        except RetryAfter as ex:
+            await asyncio.sleep(ex.timeout * 1.5)
+        except Exception as ex:
+            await call.bot.send_message(chat_id=call.message.chat.id, text=f"Во время отправки рассылки словил исключение: {ex}")
             unsuccess_mailing_num += 1
         else:
             success_mailing_num += 1
         finally:
-            await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num))
-            await asyncio.sleep(_mailing_delay_sec)
+            await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
+            await asyncio.sleep(mailing_delay_sec)
 
     admin_mailing_info[0] = "Рассылка окончена!"
-    await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num), reply_markup=await generate_back_keyboard())
+    await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num), reply_markup=await generate_back_keyboard())

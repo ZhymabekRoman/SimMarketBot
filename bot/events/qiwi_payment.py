@@ -31,7 +31,7 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
         f"Воу-воу! {payment.account} пополнил ваш кошелек на сумму {amount_rub}. Номер транзакции: {payment.txn_id}"
     ]
 
-    if not payment.comment and not payment.comment.startswith("ActiVision-") and not payment.comment.replace("ActiVision-", "").isdigit():
+    if not payment.comment or not payment.comment.startswith("ActiVision-") or not payment.comment.replace("ActiVision-", "").isdigit():
         # message_text.append(f"Баланс никому не зачислен, т.к. коментарий не является ID пользователя: [{payment.comment}]")
         ic("first if tree")
         ic(not payment.comment)
