@@ -29,6 +29,7 @@ task_manager_cb = CallbackData("task_manager", "tzid")
 cancel_task_cb = CallbackData("cancel_task", "tzid")
 paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
+# plagination_pages_cb = CallbackData("page_plagination", "pages")
 
 
 class ReciveSMS(StatesGroup):
@@ -58,9 +59,8 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
 
         if reffer and User.where(user_id=reffer).first():
             await bot.send_message(chat_id=reffer, text=f"По вашей реф. ссылке зарегистрировался {hlink(title=str(msg.chat.id), url=f'tg://user?id={msg.chat.id}')}!", parse_mode=types.ParseMode.HTML)
-            User.create(user_id=msg.chat.id, reffer_id=reffer)
-        else:
-            User.create(user_id=msg.chat.id)
+
+        User.create(user_id=msg.chat.id, reffer_id=reffer)
 
     keyboard = types.InlineKeyboardMarkup()
     sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=buy_cb.new(1))
@@ -92,10 +92,7 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     countries_btn_list = []
     for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
         summary_numbers = await sim_service.summary_numbers_count(country_code)
-        if summary_numbers == 0:
-            continue
         country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=countries_services_cb.new(1, country_code))
-        # country_btn = types.InlineKeyboardButton(country_name, callback_data=countries_services_cb.new(1, country_code))
         countries_btn_list.append(country_btn)
     keyboard_markup.add(*countries_btn_list)
 
@@ -144,7 +141,7 @@ async def countries_services_message(call: types.CallbackQuery, callback_data: d
         previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=countries_services_cb.new(page - 1, country_code))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="tester")
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="tester")  # plagination_pages_cb.new(pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
@@ -355,6 +352,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard, parse_mode=types.ParseMode.HTML)
     except Exception:
         pass
+
     await call.answer()
 
     try:
@@ -362,7 +360,9 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     except Exception:
         service_response = None
 
-    if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:
+    ic(service_response)
+
+    if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:  # , "ERROR_NO_OPERATIONS"]:
         await cancel_task_message(call, callback_data)
     else:
         await sim_service.setOperationRevise(tzid)
@@ -379,14 +379,20 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     #     await call.answer("Извините, операцию нельзя завершить сейчас, попробуйте чуть позже", True)
     #     return
 
-    if not task.get("msg"):
-        user = User.where(user_id=call.message.chat.id).first()
-        user.update(balance=user.balance + task_info.price)
+    if task:
+        msg = task.get("msg", [])
+    else:
+        msg = []
 
     msg_raw = []
-    for _msg in task.get("msg", []):
-        __received_msg = _msg.get("msg", "")
-        msg_raw.append(__received_msg)
+
+    if not msg:
+        user = User.where(user_id=call.message.chat.id).first()
+        user.update(balance=user.balance + task_info.price)
+    else:
+        for _msg in msg:
+            __received_msg = _msg.get("msg", "")
+            msg_raw.append(__received_msg)
 
     service_response = task.get("response")
     ic(service_response)

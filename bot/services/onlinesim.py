@@ -3,9 +3,9 @@ import aiohttp
 import asyncio
 
 from bot.utils.json_storager import JSONCacher
+from bot.utils.country2flag import countries_flags_dict
 
 from icecream import ic
-import traceback
 
 
 class OnlineSIM:
@@ -32,8 +32,9 @@ class OnlineSIM:
 
         _result = {}
         for country_code, country in parsed.items():
-            if country["visible"] == 1:   # and await self.summary_numbers_count(country_code) != 0:
-                _result.update({country_code: country["rus"]})
+            if country["visible"] == 1 and await self.summary_numbers_count(country_code) != 0:
+                _result.update({country_code: f'{countries_flags_dict.get(country_code, "")} {country["rus"]}'})
+
         return _result
 
     async def number_stats(self, country_code: int):
@@ -51,15 +52,12 @@ class OnlineSIM:
                 self._cache[_cache_key] = parsed
 
         _result = {}
-        try:
-            for _, service in parsed["services"].items():
-                if service["count"] != 0:
-                    _result.update({service["slug"]: service})
-        except Exception:
-            ic("Exception was interrupted in number_stats function")
-            traceback.print_exc()
-            ic(country_code)
-            ic(parsed)
+        if isinstance(parsed["services"], list):
+            return _result
+
+        for _, service in parsed["services"].items():
+            if service["count"] != 0:
+                _result.update({service["slug"]: service})
 
         return _result
 
