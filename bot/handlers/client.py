@@ -296,10 +296,12 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
 
         time = task.get("time", 0)
         number = task.get('number')
+        service_response = task.get("response")
     else:
         msg_raw = task_info.msg.get("msg")
         time = 0
         number = task_info.number
+        service_response = None
 
     countries_list = await sim_service.countries_list()
     services_list = await sim_service.number_stats(task_info.country_code)
@@ -339,7 +341,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ ID опреации: {task_info.id}",
         f"▫️ Номер телефона: {number}",
         f"▫️ Страна: {country}",
-        f"▫️ Сервис: {service['service']}",
+        f"▫️ Сервис: {service.get('service')}",
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
         f"▫️ Длительность действия номера: {expirity}",
@@ -355,17 +357,14 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
 
     await call.answer()
 
-    try:
-        service_response = task.get("response")
-    except Exception:
-        service_response = None
-
-    ic(service_response)
-
-    if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:  # , "ERROR_NO_OPERATIONS"]:
-        await cancel_task_message(call, callback_data)
+    if task:
+        if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:  # , "ERROR_NO_OPERATIONS"]:
+            await cancel_task_message(call, callback_data)
+        else:
+            await sim_service.setOperationRevise(tzid)
     else:
-        await sim_service.setOperationRevise(tzid)
+        if task_info.status == OnlinesimStatus.waiting:
+            await cancel_task_message(call, callback_data)
 
 
 @dp.callback_query_handler(cancel_task_cb.filter())
@@ -381,8 +380,10 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
 
     if task:
         msg = task.get("msg", [])
+        service_response = task.get("response")
     else:
         msg = []
+        service_response = None
 
     msg_raw = []
 
@@ -393,9 +394,6 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         for _msg in msg:
             __received_msg = _msg.get("msg", "")
             msg_raw.append(__received_msg)
-
-    service_response = task.get("response")
-    ic(service_response)
 
     if service_response in ["TZ_OVER_OK", "TZ_NUM_ANSWER"]:
         _task_status = OnlinesimStatus.success
