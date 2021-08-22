@@ -153,7 +153,7 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
     await state.finish()
 
     users = User.all()
-    mailing_delay_sec = 1
+    mailing_delay_sec = 0.5
 
     admin_mailing_info = [
         "Рассылка начата!",
@@ -183,8 +183,11 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
         else:
             success_mailing_num += 1
         finally:
-            await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
-            await asyncio.sleep(mailing_delay_sec)
+            try:
+                await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
+                await asyncio.sleep(mailing_delay_sec)
+            except RetryAfter as ex:
+                await asyncio.sleep(ex.timeout * 1.5)
 
     admin_mailing_info[0] = "Рассылка окончена!"
     await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num), reply_markup=await generate_back_keyboard())
