@@ -7,10 +7,12 @@ from bot import dp
 from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
+from bot.utils.make_tarfile import aiomake_tarfile
 
+import os
 import asyncio
 from random import randint
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class SendMailing(StatesGroup):
@@ -41,24 +43,36 @@ async def admin_panel_message(message: types.Message, msg_type="answer"):
     keyboard = types.InlineKeyboardMarkup()
     mailing_btn = types.InlineKeyboardButton("Сделать рассылку 📧", callback_data="make_mailing")
     change_user_balance_btn = types.InlineKeyboardButton("Изменить баланс юзера", callback_data="change_user_balance")
+    make_backup_btn = types.InlineKeyboardButton("Сделать резервную копию данных", callback_data="make_backup")
     keyboard.add(mailing_btn)
     keyboard.add(change_user_balance_btn)
+    keyboard.add(make_backup_btn)
 
-    _users = User.all()
+    users = User.all()
 
     _all_balance = 0
-    for _user in _users:
+    for _user in users:
         _all_balance += _user.balance
 
     message_text = [
         "Админ панель",
-        f"Общее количество пользователей: {len(_users)}",
+        f"Общее количество пользователей: {len(users)}",
         f"Общии баланс в боте: {_all_balance}"
     ]
     if msg_type == "answer":
         await message.answer('\n'.join(message_text), reply_markup=keyboard)
     elif msg_type == "edit":
         await message.edit_text('\n'.join(message_text), reply_markup=keyboard)
+
+
+@dp.callback_query_handler(text='make_backup')
+async def make_backup_message(call: types.CallbackQuery):
+    await call.answer("Процесс резервного копирования начат, ожидайте ...", True)
+    now = datetime.now()
+    date_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    created_tarfile = await aiomake_tarfile(f"ActiVision_backup_{date_time_str}", "bot/user_data/")
+    await call.bot.send_document(call.from_user.id, types.InputFile(created_tarfile))
+    os.remove(created_tarfile)
 
 
 @dp.callback_query_handler(text='change_user_balance', state='*')
@@ -150,7 +164,6 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
         "Количество успешно отправленных рассылок: {0}",
         "Количество не отправленных рассылок: {1}",
         "Количество юзеров, заблокировавших бота: {2}"
-        # f"Время окончания рассылки: примерно в {datetime.utcnow() + timedelta(seconds=mailing_delay_sec * len(users))}"
     ]
 
     success_mailing_num = 0
