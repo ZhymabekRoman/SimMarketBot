@@ -24,10 +24,12 @@ from aioqiwi.wallet import Wallet
 from bot.services.qiwi import QIWIHistoryPoll
 from bot.services.converter import CurrencyConverter
 from bot.services.onlinesim import OnlineSIM
+from bot.services.yoomoney import Client, YooMoneyHistoryPoll
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+logging.getLogger('aiogram').setLevel(logging.WARNING)
 
 # Initalialization API token for work with Telegram Bot
 API_TOKEN = base64_decode(config.API_TOKEN)
@@ -56,11 +58,15 @@ QIWI_API_TOKEN = base64_decode(config.QIWI_API_TOKEN)
 
 qiwi_wallet = Wallet(api_hash=QIWI_API_TOKEN, loop=loop, phone_number=config.QIWI_WALLET)
 qiwi_poller = QIWIHistoryPoll(
+    loop,
     qiwi_wallet,
     waiting_time=60,
     limit=50,
     process_old_to_new=True,
 )
+
+yoomoney_client = Client(config.YOOMONEY_TOKEN)
+yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
 currency_converter = CurrencyConverter(base64_decode(config.EXCHANGE_RATE_API_TOKEN))
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)

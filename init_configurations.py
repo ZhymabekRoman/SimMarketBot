@@ -41,6 +41,9 @@ async def main():
 
     admin_username = input("Введите юзернем админа, который будет отвечать за мониторингом пополнение баланса, с знаком @ (например - @example): ")
 
+    yoomoney_receiver = input("Введите YooMoney адрес кошелька куда вы хотите получать деньги: ")
+    yoomoney_token = input("Введите YooMoney токен (ТОКЕН!): ")
+
     with open(os.path.join(CONFIG_DIR, "config.py"), "w") as file:
         file.write("# Declare Telegram Bot API token\n")
         file.write(f"API_TOKEN = '{base64_encode(bot_api_token)}'\n")
@@ -56,8 +59,12 @@ async def main():
         file.write(f"EXCHANGE_RATE_API_TOKEN = '{base64_encode(exchangerate_rate_token)}'\n")
         file.write("# Declare Online SIM service API tolen\n")
         file.write(f"ONLINE_SIM_API_TOKEN = '{base64_encode(onlinesim_api_token)}'")
-        file.write("# Declare admin username\n")
+        file.write("# Declare Admin username with @\n")
         file.write(f"ADMIN_USERNAME = '{admin_username}'\n")
+        file.write("# Declare YooMoney wallet\n")
+        file.write(f"YOOMONEY_RECEIVER = '{yoomoney_receiver}'\n")
+        file.write("# Declare YooMoney token\n")
+        file.write(f"YOOMONEY_TOKEN = '{yoomoney_token}'")
 
     print("Готово!")
 

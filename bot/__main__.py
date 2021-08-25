@@ -1,4 +1,4 @@
-from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, currency_converter
+from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, currency_converter, yoomoney_poller
 
 from bot.events import qiwi_payment
 from bot.handlers import admin
@@ -24,6 +24,8 @@ async def on_bot_startup(dp: Dispatcher):
 
     logger.info("Start QIWI poller ...")
     loop.create_task(qiwi_poller.run_polling())
+    logger.info("Start YooMoney poller ...")
+    loop.create_task(yoomoney_poller.run_polling())
 
 
 async def on_bot_shutdown(dp: Dispatcher):

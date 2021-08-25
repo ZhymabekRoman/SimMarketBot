@@ -1,7 +1,7 @@
 from bot import bot, qiwi_wallet, currency_converter
 from bot.user_data import config
 from bot.models.user import User
-from bot.models.refills import Refill
+from bot.models.refills import Refill, RefillSource
 
 from aioqiwi.wallet import types as aioqiwi_types
 from aiogram.utils.markdown import hlink
@@ -28,21 +28,21 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
         # await currency_converter.convert(payment.sum.amount, from_currency)
 
     message_text = [
-        f"Воу-воу! {payment.account} пополнил ваш кошелек на сумму {amount_rub}. Номер транзакции: {payment.txn_id}"
+        f"[QIWI] Воу-воу! {payment.account} пополнил ваш кошелек на сумму {amount_rub}. Номер транзакции: {payment.txn_id}"
     ]
 
     if not payment.comment or not payment.comment.startswith("ActiVision-") or not payment.comment.replace("ActiVision-", "").isdigit():
-        # message_text.append(f"Баланс никому не зачислен, т.к. коментарий не является ID пользователя: [{payment.comment}]")
         ic("first if tree")
         ic(not payment.comment)
         ic(not payment.comment.startswith("ActiVision-"))
         ic(not payment.comment.replace("ActiVision-", "").isdigit())
         return
-    elif User.where(user_id=payment.comment.replace("ActiVision-", "")).first() is None:
+
+    user_id = int(payment.comment.replace("ActiVision-", ""))
+
+    if User.where(user_id=user_id).first() is None:
         message_text.append(f"Баланс никому не зачислен, т.к. данного ID пользывателя нету в базе: [{payment.comment.replace('ActiVision-', '')}]")
     else:
-        user_id = int(payment.comment.replace("ActiVision-", ""))
-
         if payment.status != "SUCCESS":
             message_text.append(f"ID пользыватель {hlink(title=str(user_id), url=f'tg://user?id={user_id}')} найден в базе, но во время пополнения произошла ошибка.")
             try:
@@ -60,6 +60,6 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
                 pass
             message_text.append(f"Баланс успешно зачислен ID пользывателю {hlink(title=str(user_id), url=f'tg://user?id={user_id}')}")
 
-        Refill.create(user_id=user_id, txn_id=payment.txn_id, amount=amount_rub, data=payment.json())
+        Refill.create(user_id=user_id, txn_id=payment.txn_id, amount=amount_rub, data=payment.json(), source=RefillSource.QIWI)
 
     await bot.send_message(chat_id=config.ADMIN_ID, text='\n'.join(message_text), parse_mode=types.ParseMode.HTML)

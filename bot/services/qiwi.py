@@ -10,9 +10,9 @@ logger = logging.getLogger("qiwi_poller")
 
 class QIWIHistoryPoll:
     # Код основан на https://github.com/uwinx/aioqiwi/blob/e5aa5ddd38369678cb48af7f1791fa3644e06103/aioqiwi/contrib/history_polling.py
-    def __init__(self, client, waiting_time, limit, process_old_to_new=True, payment_type="IN"):
+    def __init__(self, loop, client, waiting_time, limit, process_old_to_new=True, payment_type="IN"):
         self._client = client
-
+        self.loop = loop
         self.waiting_time = waiting_time
         self.limit_per_request = limit
 
@@ -62,15 +62,11 @@ class QIWIHistoryPoll:
             raise ValueError("Wallet has to have handler manager")
 
         while True:
-            # try:
-                _left_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
+            _left_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
 
-                logger.debug(f"Going to sleep {self.waiting_time}")
-                await asyncio.sleep(self.waiting_time)
+            logger.debug(f"Going to sleep {self.waiting_time}")
+            await asyncio.sleep(self.waiting_time)
 
-                _right_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
-                logger.debug("Checking new payments via QIWI history API....")
-                await self.poll(_left_time, _right_time)
-
-            # except Exception:
-            #     pass
+            _right_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
+            logger.debug("Checking new payments via QIWI history API....")
+            self.loop.create_task(self.poll(_left_time, _right_time))

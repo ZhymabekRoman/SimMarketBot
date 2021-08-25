@@ -10,6 +10,7 @@ from bot.models.refills import Refill, RefillSource
 from bot.models.onlinesim import Onlinesim, OnlinesimStatus
 from bot.user_data import config
 from bot.utils.qiwi import generate_qiwi_payment_form_link
+from bot.utils.yoomoney import generate_yoomoney_payment_form_link
 from bot.utils.timedelta import readable_timedelta
 
 import os
@@ -514,8 +515,10 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
 
     keyboard = types.InlineKeyboardMarkup()
     qiwi_btn = types.InlineKeyboardButton("QIWI", callback_data=refill_balance_via_cb.new(amount=amount, method="qiwi"))
+    yoomoney_btn = types.InlineKeyboardButton("YooMoney", callback_data=refill_balance_via_cb.new(amount=amount, method="yoomoney"))
     back_btn = types.InlineKeyboardButton("Назад", callback_data="refill_balance")
     keyboard.add(qiwi_btn)
+    keyboard.add(yoomoney_btn)
     keyboard.add(back_btn)
     message_text = [
         "Выберите один из способов пополнения",
@@ -542,12 +545,38 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_da
     keyboard.add(payement_qiwi_btn)
     keyboard.add(back_btn)
     message_text = [
-        "💲 Пополнение баланса через киви 💲",
+        "💲 Пополнение баланса через QIWI 💲",
         "",
         "▫️ Для пополнения баланса переведите нужную сумму на",
         f"▫️ Qiwi кошелек: `{config.QIWI_WALLET}`",
         "❗️ В комментарии платежа ОБЯЗАТЕЛЬНО укажите:",
         f'`{qiwi_payment_comment}`',
+        "▫️ Деньги зачисляться автоматически в течении 1 минут",
+        "▫️ Вы получите уведомление в боте"
+    ]
+    await call.message.edit_caption('\n'.join(message_text), parse_mode=types.ParseMode.MARKDOWN, reply_markup=keyboard)
+    await call.answer()
+
+    await state.finish()
+
+
+@dp.callback_query_handler(refill_balance_via_cb.filter(method=["yoomoney"]), state=PaymentMethod.waiting_method)
+async def refill_balance_via_yoomoney_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    amount = int(callback_data.get("amount", 700))
+
+    yoomoney_payment_label = f"ActiVision-{call.message.chat.id}"
+    yoomoney_payment_link = generate_yoomoney_payment_form_link(config.YOOMONEY_RECEIVER, "Пополнение баланс бота ActiVision", yoomoney_payment_label, amount)
+
+    keyboard = types.InlineKeyboardMarkup()
+    payement_yoomoney_btn = types.InlineKeyboardButton("Перейти к оплате", yoomoney_payment_link)
+    back_btn = types.InlineKeyboardButton("Назад", callback_data="refill_balance")
+    keyboard.add(payement_yoomoney_btn)
+    keyboard.add(back_btn)
+    message_text = [
+        "💲 Пополнение баланса через YooMoney 💲",
+        "",
+        "▫️ Для пополнения баланса переведите нужную сумму на",
+        f"▫️ YooMoney кошелек: `{config.YOOMONEY_RECEIVER}`",
         "▫️ Деньги зачисляться автоматически в течении 1 минут",
         "▫️ Вы получите уведомление в боте"
     ]
