@@ -8,6 +8,7 @@ from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.utils.make_tarfile import aiomake_tarfile
+from bot.utils.bidirectional_iterator import BidirectionalIterator
 
 import os
 import asyncio
@@ -152,8 +153,8 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
     await state.finish()
 
-    users = User.all()
-    mailing_delay_sec = 0.5
+    users = BidirectionalIterator(User.all())
+    mailing_delay_sec = 0.2
 
     admin_mailing_info = [
         "Рассылка начата!",
@@ -170,24 +171,28 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
     unsuccess_mailing_num = 0
     bot_blocked_users_num = 0
 
-    for user in users:
+    while True:
         try:
+            user = users.next()
             await message_to_mailing.send_copy(user.user_id)
         except BotBlocked:
             bot_blocked_users_num += 1
         except RetryAfter as ex:
             await asyncio.sleep(ex.timeout * 1.5)
+            users.prev()
+        except StopIteration:
+            admin_mailing_info[0] = "Рассылка окончена!"
+            break
         except Exception as ex:
             await call.bot.send_message(chat_id=call.message.chat.id, text=f"Во время отправки рассылки словил исключение: {ex}")
             unsuccess_mailing_num += 1
         else:
             success_mailing_num += 1
         finally:
-            try:
-                await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
-                await asyncio.sleep(mailing_delay_sec)
-            except RetryAfter as ex:
-                await asyncio.sleep(ex.timeout * 1.5)
-
-    admin_mailing_info[0] = "Рассылка окончена!"
-    await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num), reply_markup=await generate_back_keyboard())
+            await asyncio.sleep(mailing_delay_sec)
+            if users.index == 0 or (users.index + 1) % 10 == 0 or users.index + 1 == len(users):
+                try:
+                    await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
+                except RetryAfter as ex:
+                    print("Retry After was interpreted")
+                    await asyncio.sleep(ex.timeout * 1.5)
