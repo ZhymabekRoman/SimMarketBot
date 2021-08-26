@@ -38,7 +38,7 @@ class History:
         self.label = label
         try:
             if from_date is not None:
-                from_date = "{Y}-{m}-{d}T{H}:{M}:{S}".format(
+                from_date = "{Y}-{m}-{d}T{H}:{M}:{S}+03:00".format(
                     Y=str(from_date.year),
                     m=str(from_date.month),
                     d=str(from_date.day),
@@ -46,12 +46,12 @@ class History:
                     M=str(from_date.minute),
                     S=str(from_date.second)
                 )
-        except:
+        except Exception:
             raise IllegalParamFromDate()
 
         try:
             if till_date is not None:
-                till_date = "{Y}-{m}-{d}T{H}:{M}:{S}".format(
+                till_date = "{Y}-{m}-{d}T{H}:{M}:{S}+03:00".format(
                     Y=str(till_date.year),
                     m=str(till_date.month),
                     d=str(till_date.day),
@@ -59,7 +59,7 @@ class History:
                     M=str(till_date.minute),
                     S=str(till_date.second)
                 )
-        except:
+        except Exception:
             IllegalParamTillDate()
 
         self.from_date = from_date

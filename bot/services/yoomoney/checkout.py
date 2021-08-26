@@ -23,7 +23,7 @@ class YooMoneyHistoryPoll:
         self.loop = loop
 
     async def poll(self, left_date, right_date):
-        history = await self.client.operation_history(from_date=left_date, till_date=right_date)
+        history = await self.client.operation_history(type="deposition", from_date=left_date, till_date=right_date)
 
         if not history.operations:
             logger.debug("No new transaction found")
