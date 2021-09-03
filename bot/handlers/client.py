@@ -471,7 +471,9 @@ async def refill_balance_message(call: types.CallbackQuery):
     message_text = [
         "Вы можете пополнить сумму ниже через кнопку, либо введите желаемую сумму:",
         "",
-        "Пример: 100"
+        "Пример: 100",
+        "",
+        "P.S.: Сейчас действует акция - При пополнении баланса бота от 1000 рублей +5% бонус. От 2000 рублей и более +10% Налетай пока не поздно!"
     ]
 
     back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
@@ -511,7 +513,7 @@ async def refill_balance_amount_message(msg: types.Message, state: FSMContext):
 @dp.message_handler(state=PaymentMethod.waiting_method, content_types=types.ContentTypes.TEXT)
 async def refill_balance_method_message(msg: types.Message, state: FSMContext, msg_type: str = "answer"):
     user_data = await state.get_data()
-    amount = int(user_data.get("amount", 700))
+    amount = user_data.get("amount", 700)
 
     keyboard = types.InlineKeyboardMarkup()
     qiwi_btn = types.InlineKeyboardButton("QIWI", callback_data=refill_balance_via_cb.new(amount=amount, method="qiwi"))
@@ -521,6 +523,8 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
     keyboard.add(yoomoney_btn)
     keyboard.add(back_btn)
     message_text = [
+        f"Текущая сумма пополнения: {amount}",
+        "",
         "Выберите один из способов пополнения",
         f"Если они вам по какой-то причине не подходят, то вы можете написать админу: {config.ADMIN_USERNAME}"
     ]
@@ -575,8 +579,6 @@ async def refill_balance_via_yoomoney_message(call: types.CallbackQuery, callbac
     message_text = [
         "💲 Пополнение баланса через YooMoney 💲",
         "",
-        # "▫️ Для пополнения баланса переведите нужную сумму на",
-        # f"▫️ YooMoney кошелек: `{config.YOOMONEY_RECEIVER}`",
         "▫️ Деньги зачисляться автоматически в течении 1 минут",
         "▫️ Вы получите уведомление в боте"
     ]
@@ -614,7 +616,6 @@ async def check_referrals(call: types.CallbackQuery):
         "▫️ В нашем боте действует одноуровневая партнёрская программа с оплатой за каждый купленный рефералом номер. В будущем планируем добавить до 3 уровней партнерской программы",
         "",
         f"▫️ 1 уровень - 0.25₽ за номер: {len(referrals)} партнёров принесли {referrals_balance}₽",
-        # f"Количество ваших рефералов: {len(referrals)}",
         "",
         "🔗 Ваша партнёрская ссылка:",
         bot_link

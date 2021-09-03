@@ -28,7 +28,7 @@ from bot.services.yoomoney import Client, YooMoneyHistoryPoll
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
 logging.getLogger('aiogram').setLevel(logging.WARNING)
 
 # Initalialization API token for work with Telegram Bot

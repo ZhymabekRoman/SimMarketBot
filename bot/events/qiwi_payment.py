@@ -27,6 +27,15 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
         # TODO: Need table with ISO 4217 codes list for currency converting: 643 --> RUB
         # await currency_converter.convert(payment.sum.amount, from_currency)
 
+    if amount_rub >= 1000 < 2000:
+        percent = 5
+    elif amount_rub >= 2000:
+        percent = 10
+    else:
+        percent = 0
+
+    amount_rub = (amount_rub * (percent / 100)) + amount_rub
+
     message_text = [
         f"[QIWI] Воу-воу! {payment.account} пополнил ваш кошелек на сумму {amount_rub}. Номер транзакции: {payment.txn_id}"
     ]

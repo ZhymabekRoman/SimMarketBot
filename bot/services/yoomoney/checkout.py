@@ -35,6 +35,15 @@ class YooMoneyHistoryPoll:
 
             amount_rub = operation.amount
 
+            if amount_rub >= 1000 < 2000:
+                percent = 5
+            elif amount_rub >= 2000:
+                percent = 10
+            else:
+                percent = 0
+
+            amount_rub = (amount_rub * (percent / 100)) + amount_rub
+
             message_text = [
                 f"[YooMoney] Воу-воу! кто-то пополнил ваш кошелек на сумму {amount_rub}. Номер транзакции: {operation.operation_id}"
             ]
