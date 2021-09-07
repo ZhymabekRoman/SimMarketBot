@@ -23,14 +23,14 @@ from requests.models import PreparedRequest
 from icecream import ic
 
 buy_cb = CallbackData("buy_number", "page")
-countries_services_cb = CallbackData("countries_services", "page", "country_code")
+country_services_cb = CallbackData("countries_services", "page", "country_code")
 service_cb = CallbackData("service", "country_code", "service_code")
 buy_number_cb = CallbackData("buy_service_number", "country_code", "service_code", "price")
 task_manager_cb = CallbackData("task_manager", "tzid")
 cancel_task_cb = CallbackData("cancel_task", "tzid")
 paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
-# plagination_pages_cb = CallbackData("page_plagination", "pages")
+plagination_pages_cb = CallbackData("page_plagination", "action", "pages")
 
 
 class ReciveSMS(StatesGroup):
@@ -83,17 +83,35 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
         await msg.edit_caption("\n".join(message_text), reply_markup=keyboard)
 
 
+@dp.callback_query_handler(plagination_pages_cb.filter())
+async def plagination_pages_message(call: types.CallbackQuery, callback_data: dict):
+    pages = int(callback_data["pages"])
+    action = callback_data["action"]
+
+    if action == "countries":
+        do_action = buy_cb
+    elif action == "services":
+        do_action = country_services_cb
+
+    keyboard_markup = types.InlineKeyboardMarkup(row_width=5)
+    for page in range(pages):
+        page_btn = types.InlineKeyboardButton(page + 1, callback_data=do_action.new(page + 1))
+        keyboard_markup.insert(page_btn)
+    await call.message.edit_caption("📖 Пожалуйста, выберите страницу", reply_markup=keyboard_markup)
+    await call.answer()
+
+
 @dp.callback_query_handler(buy_cb.filter())
 async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMContext, callback_data: dict):
     page = int(callback_data["page"])
     countries_list = await sim_service.countries_list()
-    keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
     pages_number = math.ceil(float(len(countries_list)) / float(15))
 
+    keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
     countries_btn_list = []
     for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
         summary_numbers = await sim_service.summary_numbers_count(country_code)
-        country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=countries_services_cb.new(1, country_code))
+        country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=country_services_cb.new(1, country_code))
         countries_btn_list.append(country_btn)
     keyboard_markup.add(*countries_btn_list)
 
@@ -103,7 +121,7 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
         previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=buy_cb.new(page - 1))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="tester")
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=plagination_pages_cb.new("countries", pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
@@ -119,8 +137,8 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     await call.answer()
 
 
-@dp.callback_query_handler(countries_services_cb.filter())
-async def countries_services_message(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(country_services_cb.filter())
+async def country_services_message(call: types.CallbackQuery, callback_data: dict):
     page = int(callback_data["page"])
     country_code = callback_data["country_code"]
     services_list = await sim_service.number_stats(country_code)
@@ -139,14 +157,14 @@ async def countries_services_message(call: types.CallbackQuery, callback_data: d
     plagination_keyboard_list = []
 
     if page > 1:
-        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=countries_services_cb.new(page - 1, country_code))
+        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=country_services_cb.new(page - 1, country_code))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="tester")  # plagination_pages_cb.new(pages_number))
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=plagination_pages_cb.new("services", pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
-        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=countries_services_cb.new(page + 1, country_code))
+        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=country_services_cb.new(page + 1, country_code))
         plagination_keyboard_list.append(next_page_btn)
 
     keyboard_markup.row(*plagination_keyboard_list)
@@ -180,7 +198,7 @@ async def service_message(call: types.CallbackQuery, callback_data: dict):
 
     keyboard_markup = types.InlineKeyboardMarkup()
     buy_btn = types.InlineKeyboardButton("Купить", callback_data=buy_number_cb.new(country_code, service_code, price))
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_services_cb.new(1, country_code))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
     keyboard_markup.add(buy_btn)
     keyboard_markup.add(back_btn)
 
@@ -321,7 +339,10 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
 
     keyboard = types.InlineKeyboardMarkup()
     if task_info.status == OnlinesimStatus.waiting:
-        cancel_task_btn = types.InlineKeyboardButton("📛 Отменить / Завершить операцию", callback_data=cancel_task_cb.new(tzid))
+        if msg_raw:
+            cancel_task_btn = types.InlineKeyboardButton("✅ Завершить операцию", callback_data=cancel_task_cb.new(tzid))
+        else:
+            cancel_task_btn = types.InlineKeyboardButton("📛 Отменить операцию", callback_data=cancel_task_cb.new(tzid))
         keyboard.add(cancel_task_btn)
         update_btn = types.InlineKeyboardButton("♻️ Обновить", callback_data=task_manager_cb.new(tzid))
         keyboard.add(update_btn)
