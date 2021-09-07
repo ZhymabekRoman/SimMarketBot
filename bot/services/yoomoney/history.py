@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from http3 import AsyncClient
+import aiohttp
 import json
 from .operation import Operation
 
@@ -144,7 +144,6 @@ class History:
         return self
 
     async def _request(self):
-        client = AsyncClient()
         access_token = str(self.__private_token)
         url = self.__private_base_url + self.__private_method
 
@@ -169,6 +168,8 @@ class History:
         if self.details is not None:
             payload["details"] = self.details
 
-        response = await client.post(url, headers=headers, data=payload)
+        async with aiohttp.ClientSession() as client:
+            async with client.post(url, headers=headers, data=payload) as response:
+                result = await response.text()
 
-        return json.loads(response.text)
+        return json.loads(result)

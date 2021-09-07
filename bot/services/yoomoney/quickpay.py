@@ -1,4 +1,4 @@
-from http3 import AsyncClient
+import aiohttp
 
 
 class Quickpay:
@@ -40,7 +40,6 @@ class Quickpay:
         self.redirected_url = redirected_url
 
     async def start(self):
-        client = AsyncClient()
         self.base_url = "https://yoomoney.ru/quickpay/confirm.xml?"
 
         payload = {"receiver": self.receiver, "quickpay_form": self.quickpay_form, "targets": self.targets,
@@ -70,7 +69,9 @@ class Quickpay:
             self.base_url += "&"
 
         self.base_url = self.base_url[:-1].replace(" ", "%20")
-        self.response = await client.post(self.base_url)
+        async with aiohttp.ClientSession() as client:
+            async with await client.post(self.base_url) as response:
+                self.response = response
         self.redirected_url = self.response.url
         return self
 
