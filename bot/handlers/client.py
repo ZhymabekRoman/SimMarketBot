@@ -12,9 +12,9 @@ from bot.user_data import config
 from bot.utils.qiwi import generate_qiwi_payment_form_link
 from bot.utils.yoomoney import generate_yoomoney_payment_form_link
 from bot.utils.timedelta import readable_timedelta
+from bot.utils.sms_code import mark_sms_code
 
 import os
-import re
 import pytz
 import datetime
 import math
@@ -22,15 +22,16 @@ from requests.models import PreparedRequest
 
 from icecream import ic
 
-buy_cb = CallbackData("buy_number", "page")
-country_services_cb = CallbackData("countries_services", "page", "country_code")
+countries_cb = CallbackData("countries", "page")
+country_services_cb = CallbackData("country_services", "page", "country_code")
 service_cb = CallbackData("service", "country_code", "service_code")
 buy_number_cb = CallbackData("buy_service_number", "country_code", "service_code", "price")
 task_manager_cb = CallbackData("task_manager", "tzid")
 cancel_task_cb = CallbackData("cancel_task", "tzid")
 paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
-plagination_pages_cb = CallbackData("page_plagination", "action", "pages")
+countries_page_navigation_cb = CallbackData("countries_page_navigation", "pages")
+services_page_navigation_cb = CallbackData("services_page_navigation", "country_code" "pages")
 
 
 class ReciveSMS(StatesGroup):
@@ -64,7 +65,7 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
         User.create(user_id=msg.chat.id, reffer_id=reffer)
 
     keyboard = types.InlineKeyboardMarkup()
-    sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=buy_cb.new(1))
+    sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=countries_cb.new(1))
     all_sms_operations_btn = types.InlineKeyboardButton("📫 Все СМС операции", callback_data="all_operations")
     partners_btn = types.InlineKeyboardButton("👥 Партнёрская программа", callback_data="partners")
     balance_btn = types.InlineKeyboardButton("💳 Баланс", callback_data="balance")
@@ -83,49 +84,41 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
         await msg.edit_caption("\n".join(message_text), reply_markup=keyboard)
 
 
-@dp.callback_query_handler(plagination_pages_cb.filter())
-async def plagination_pages_message(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(countries_page_navigation_cb.filter())
+async def countries_page_navigation__message(call: types.CallbackQuery, callback_data: dict):
     pages = int(callback_data["pages"])
-    action = callback_data["action"]
-
-    if action == "countries":
-        do_action = buy_cb
-    elif action == "services":
-        do_action = country_services_cb
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=5)
     for page in range(pages):
-        page_btn = types.InlineKeyboardButton(page + 1, callback_data=do_action.new(page + 1))
+        page_btn = types.InlineKeyboardButton(page + 1, callback_data=countries_cb.new(page + 1))
         keyboard_markup.insert(page_btn)
     await call.message.edit_caption("📖 Пожалуйста, выберите страницу", reply_markup=keyboard_markup)
     await call.answer()
 
 
-@dp.callback_query_handler(buy_cb.filter())
+@dp.callback_query_handler(countries_cb.filter())
 async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMContext, callback_data: dict):
     page = int(callback_data["page"])
     countries_list = await sim_service.countries_list()
     pages_number = math.ceil(float(len(countries_list)) / float(15))
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
-    countries_btn_list = []
     for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
         summary_numbers = await sim_service.summary_numbers_count(country_code)
         country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=country_services_cb.new(1, country_code))
-        countries_btn_list.append(country_btn)
-    keyboard_markup.add(*countries_btn_list)
+        keyboard_markup.insert(country_btn)
 
     plagination_keyboard_list = []
 
     if page > 1:
-        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=buy_cb.new(page - 1))
+        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=countries_cb.new(page - 1))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=plagination_pages_cb.new("countries", pages_number))
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=countries_page_navigation_cb.new(pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
-        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=buy_cb.new(page + 1))
+        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=countries_cb.new(page + 1))
         plagination_keyboard_list.append(next_page_btn)
 
     keyboard_markup.row(*plagination_keyboard_list)
@@ -148,11 +141,9 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
     country = countries_list.get(country_code)
 
     keyboard_markup = types.InlineKeyboardMarkup()
-    services_btn_list = []
     for service_code, service in list(services_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
         service_btn = types.InlineKeyboardButton(f"{service['service']} ({service['count']})", callback_data=service_cb.new(country_code, service_code))
-        services_btn_list.append(service_btn)
-    keyboard_markup.add(*services_btn_list)
+        keyboard_markup.insert(service_btn)
 
     plagination_keyboard_list = []
 
@@ -169,7 +160,7 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
 
     keyboard_markup.row(*plagination_keyboard_list)
 
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=buy_cb.new(1))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
     keyboard_markup.add(back_btn)
 
     await call.message.edit_caption(f"🌍 Выбранная страна: {country}\n2. Веберите сервис, от которого вам необходимо принять СМС", reply_markup=keyboard_markup)
@@ -189,11 +180,11 @@ async def service_message(call: types.CallbackQuery, callback_data: dict):
     price = (service['price'] * (config.COMMISSION_AMOUNT / 100)) + service['price']
 
     message_text = [
-        f"▫️ Выбранный сервис: {service['service']}",
+        f"▫️ Выбранный сервис: {service.get('service')}",
         f"▫️ Выбранная страна: {country}",
         "",
         f"▫️ Цена: {price}₽",
-        f"▫️ В наличии: {service['count']} номеров"
+        f"▫️ В наличии: {service.get('count')} номеров"
     ]
 
     keyboard_markup = types.InlineKeyboardMarkup()
@@ -237,6 +228,7 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     except Exception:
         await call.answer("Извините, что-то пошло не так", True)
         return
+        raise
 
     Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status.get('number'))
     user.update(balance=user_balance - service_price)
@@ -317,7 +309,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         number = task.get('number')
         service_response = task.get("response")
     else:
-        msg_raw = task_info.msg.get("msg")
+        msg_raw = task_info.msg
         time = 0
         number = task_info.number
         service_response = None
@@ -350,14 +342,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     keyboard.add(black_btn)
 
     expirity = readable_timedelta(datetime.timedelta(seconds=time))
-
-    msg = []
-    for _msg in msg_raw:
-        finded_numbered_words = re.findall(r"\b(\d+)\b", _msg)
-        for numbered_word in finded_numbered_words:
-            _msg = re.sub(r'\b%s\b' % numbered_word, f'<code>{numbered_word}</code>', _msg)
-        msg.append(_msg)
-    msg = '\n'.join(msg)
+    msg = '\n'.join(mark_sms_code(msg_raw))
 
     message_text = [
         f"▫️ ID опреации: {task_info.id}",
@@ -380,7 +365,8 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     await call.answer()
 
     if task:
-        if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:  # , "ERROR_NO_OPERATIONS"]:
+        task_info.update(msg=msg_raw)
+        if service_response in ["TZ_OVER_EMPTY", "TZ_OVER_OK"]:
             await cancel_task_message(call, callback_data)
         else:
             await sim_service.setOperationRevise(tzid)
@@ -401,10 +387,10 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     #     return
 
     if task:
-        msg = task.get("msg", [])
+        msg_raw = task.get("msg", [])
         service_response = task.get("response")
     else:
-        msg = []
+        msg_raw = task_info.msg
         service_response = None
 
     msg_raw = []
@@ -427,7 +413,7 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         ic(f"Unknown task status: {service_response}")
         _task_status = OnlinesimStatus.cancel
 
-    task_info.update(msg={"msg": msg_raw}, status=_task_status)
+    task_info.update(msg=msg_raw, status=_task_status)
 
     close_task_info = await sim_service.setOperationOk(tzid)
     await task_manager_message(call, callback_data)

@@ -1,5 +1,5 @@
 from aiogram import types
-from aiogram.utils.exceptions import BotBlocked, RetryAfter
+from aiogram.utils.exceptions import BotBlocked, RetryAfter, UserDeactivated
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 
@@ -18,6 +18,7 @@ from datetime import datetime
 
 class SendMailing(StatesGroup):
     waiting_message_to_mailing = State()
+
 
 class ChangeBalance(StatesGroup):
     waiting_user_id = State()
@@ -175,7 +176,7 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
         try:
             user = users.next()
             await message_to_mailing.send_copy(user.user_id)
-        except BotBlocked:
+        except (BotBlocked, UserDeactivated):
             bot_blocked_users_num += 1
         except RetryAfter as ex:
             await asyncio.sleep(ex.timeout * 1.5)

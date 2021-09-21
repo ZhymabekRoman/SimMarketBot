@@ -18,56 +18,66 @@ class OnlineSIM:
         self.lock = asyncio.Lock()
 
     async def countries_list(self):
+        return self._cache["countries_list"]
+
+    async def _countries_list(self):
+        # Using alternative API
         url = "http://api-conserver.onlinesim.ru/stubs/handler_api.php"
         params = {"api_key": self.__api_key, "action": "getCountries"}
 
-        if "countries_list" in self._cache:
-            parsed = self._cache["countries_list"]
-        else:
-            async with self.session.get(url=url, params=params) as response:
-                result = await response.text()
-                parsed = json.loads(result)
-            async with self.lock:
-                self._cache["countries_list"] = parsed
+        async with self.session.get(url=url, params=params) as response:
+            result = await response.text()
+            parsed = json.loads(result)
 
         _result = {}
         for country_code, country in parsed.items():
-            if country["visible"] == 1 and await self.summary_numbers_count(country_code) != 0:
+            if country["visible"] == 1 and await self._summary_numbers_count(country_code) != 0:
                 _result.update({country_code: f'{countries_flags_dict.get(country_code, "")} {country["rus"]}'})
+
+        async with self.lock:
+            self._cache["countries_list"] = _result
 
         return _result
 
     async def number_stats(self, country_code: int):
+        _cache_key = str({"number_stats": country_code})
+        return self._cache[_cache_key]
+
+    async def _number_stats(self, country_code: int):
         url = "https://onlinesim.ru/api/getNumbersStats.php"
         params = {"apikey": self.__api_key, "country": country_code}
 
-        _cache_key = str({"number_stats": country_code})
-        if _cache_key in self._cache:
-            parsed = self._cache[_cache_key]
-        else:
-            async with self.session.get(url=url, params=params) as response:
-                result = await response.text()
-                parsed = json.loads(result)
-            async with self.lock:
-                self._cache[_cache_key] = parsed
+        async with self.session.get(url=url, params=params) as response:
+            result = await response.text()
+            parsed = json.loads(result)
 
         _result = {}
-        if isinstance(parsed["services"], list):
-            return _result
+        if not isinstance(parsed["services"], list):  # Workaround for OnlineSim's bug
+            for _, service in parsed["services"].items():
+                if service["count"] != 0:
+                    _result.update({service["slug"]: service})
 
-        for _, service in parsed["services"].items():
-            if service["count"] != 0:
-                _result.update({service["slug"]: service})
+        async with self.lock:
+            _cache_key = str({"number_stats": country_code})
+            self._cache[_cache_key] = _result
 
         return _result
 
     async def summary_numbers_count(self, country_code: int):
-        services_list = await self.number_stats(country_code)
+        _cache_key = str({"summary_numbers_count": country_code})
+        return self._cache[_cache_key]
+
+    async def _summary_numbers_count(self, country_code: int):
+        services_list = await self._number_stats(country_code)
 
         _result = 0
 
         for service_code, service_info in services_list.items():
             _result += service_info["count"]
+
+        async with self.lock:
+            _cache_key = str({"summary_numbers_count": country_code})
+            self._cache[_cache_key] = _result
 
         return _result
 
@@ -117,6 +127,7 @@ class OnlineSIM:
             if parsed.get("response") == "ERROR_NO_OPERATIONS":
                 return None
 
+        # OnlineSim return list, with entered tzid's operation, just for more stability let find operation by tzid manually
         for _service in parsed:
             if _service.get("tzid") == tzid:
                 return _service
@@ -150,6 +161,11 @@ class OnlineSIM:
         ic(parsed)
 
         return parsed
+
+    async def cache_updater(self, waiting_time: int = 3600):
+        while True:
+            await asyncio.sleep(waiting_time)
+            await self._countries_list()
 
     async def shutdown(self):
         await self.session.close()
