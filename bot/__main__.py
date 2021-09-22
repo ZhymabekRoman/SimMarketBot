@@ -37,8 +37,8 @@ async def on_bot_startup(dp: Dispatcher):
     logger.info("Register bot commands ...")
     await dp.bot.set_my_commands(commands)
 
-    if not sim_service._cache.get("countries_list"):
-        await sim_service.cache_updater(waiting_time=0)
+    # if not sim_service._cache.get("countries_list"):
+    #     await sim_service.cache_updater(waiting_time=0)
 
     loop.create_task(poll_manager())
 

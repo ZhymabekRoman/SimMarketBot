@@ -4,6 +4,7 @@ import asyncio
 
 from bot.utils.json_storager import JSONCacher
 from bot.utils.country2flag import countries_flags_dict
+from bot.utils.retry import retry_on_connection_issue
 
 from icecream import ic
 
@@ -20,6 +21,7 @@ class OnlineSIM:
     async def countries_list(self):
         return self._cache["countries_list"]
 
+    @retry_on_connection_issue()
     async def _countries_list(self):
         # Using alternative API
         url = "http://api-conserver.onlinesim.ru/stubs/handler_api.php"
@@ -43,6 +45,7 @@ class OnlineSIM:
         _cache_key = str({"number_stats": country_code})
         return self._cache[_cache_key]
 
+    @retry_on_connection_issue()
     async def _number_stats(self, country_code: int):
         url = "https://onlinesim.ru/api/getNumbersStats.php"
         params = {"apikey": self.__api_key, "country": country_code}
@@ -67,6 +70,7 @@ class OnlineSIM:
         _cache_key = str({"summary_numbers_count": country_code})
         return self._cache[_cache_key]
 
+    @retry_on_connection_issue()
     async def _summary_numbers_count(self, country_code: int):
         services_list = await self._number_stats(country_code)
 
@@ -81,6 +85,7 @@ class OnlineSIM:
 
         return _result
 
+    @retry_on_connection_issue()
     async def getNum(self, service_code: int, country_code: int):
         url = "https://onlinesim.ru/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
@@ -96,6 +101,7 @@ class OnlineSIM:
 
         return status, tzid
 
+    @retry_on_connection_issue()
     async def getState(
         self,
         tzid: int,
@@ -134,6 +140,7 @@ class OnlineSIM:
         else:
             raise
 
+    @retry_on_connection_issue()
     async def setOperationRevise(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationRevise.php"
         params = {
@@ -148,6 +155,7 @@ class OnlineSIM:
 
         return parsed
 
+    @retry_on_connection_issue()
     async def setOperationOk(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationOk.php"
         params = {

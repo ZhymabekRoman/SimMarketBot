@@ -5,6 +5,8 @@ import logging
 import asyncio
 import pytz
 
+from bot.utils.retry import retry_on_connection_issue
+
 logger = logging.getLogger("qiwi_poller")
 
 
@@ -35,6 +37,7 @@ class QIWIHistoryPoll:
 
         self.process_old_to_new = process_old_to_new
 
+    @retry_on_connection_issue()
     async def poll(self, left_date, right_date):
         history = await self._client.history(
             self.limit_per_request,

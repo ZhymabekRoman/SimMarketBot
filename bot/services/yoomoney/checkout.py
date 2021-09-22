@@ -11,6 +11,7 @@ from aiogram.utils.markdown import hlink
 from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
+from bot.utils.retry import retry_on_connection_issue
 
 logger = logging.getLogger("yoomoney-poller")
 
@@ -22,6 +23,7 @@ class YooMoneyHistoryPoll:
         self.bot = bot
         self.loop = loop
 
+    @retry_on_connection_issue()
     async def poll(self, left_date, right_date):
         history = await self.client.operation_history(type="deposition", from_date=left_date, till_date=right_date)
 
