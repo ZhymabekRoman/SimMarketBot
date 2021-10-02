@@ -70,8 +70,3 @@ yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
 currency_converter = CurrencyConverter(base64_decode(config.EXCHANGE_RATE_API_TOKEN))
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)
-
-result_list = Onlinesim.all()
-for result in result_list:
-    if isinstance(result.msg, dict):
-        result.update(msg=result.msg["msg"])

@@ -194,7 +194,6 @@ class OnlineSIM:
         return parsed
 
     async def cache_updater(self, waiting_time: int = 3600):
-        await self._countries_list()
         while True:
             await asyncio.sleep(waiting_time)
             await self._countries_list()
