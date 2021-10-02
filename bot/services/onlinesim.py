@@ -6,7 +6,30 @@ from bot.utils.json_storager import JSONCacher
 from bot.utils.country2flag import countries_flags_dict
 from bot.utils.retry import retry_on_connection_issue
 
+from fuzzywuzzy import process, fuzz
+from pydantic import BaseModel, validator
+
 from icecream import ic
+
+
+class getStateModel(BaseModel):
+    country: int
+    form: str
+    number: str
+    response: str
+    service: str
+    sum: int
+    time: int
+    tzid: int
+    msg: list = []
+
+    @validator("msg", pre=True, always=True)
+    def set_msg(cls, msg_raw):
+        msg_list = []
+        for msg in msg_raw:
+            received_msg = msg.get("msg", "")
+            msg_list.append(received_msg)
+        return msg_list
 
 
 class OnlineSIM:
@@ -42,7 +65,7 @@ class OnlineSIM:
         return _result
 
     async def number_stats(self, country_code: int):
-        _cache_key = str({"number_stats": country_code})
+        _cache_key = str({"number_stats": str(country_code)})
         return self._cache[_cache_key]
 
     @retry_on_connection_issue()
@@ -61,13 +84,13 @@ class OnlineSIM:
                     _result.update({service["slug"]: service})
 
         async with self.lock:
-            _cache_key = str({"number_stats": country_code})
+            _cache_key = str({"number_stats": str(country_code)})
             self._cache[_cache_key] = _result
 
         return _result
 
     async def summary_numbers_count(self, country_code: int):
-        _cache_key = str({"summary_numbers_count": country_code})
+        _cache_key = str({"summary_numbers_count": str(country_code)})
         return self._cache[_cache_key]
 
     @retry_on_connection_issue()
@@ -80,7 +103,7 @@ class OnlineSIM:
             _result += service_info["count"]
 
         async with self.lock:
-            _cache_key = str({"summary_numbers_count": country_code})
+            _cache_key = str({"summary_numbers_count": str(country_code)})
             self._cache[_cache_key] = _result
 
         return _result
@@ -136,7 +159,7 @@ class OnlineSIM:
         # OnlineSim return list, with entered tzid's operation, just for more stability let find operation by tzid manually
         for _service in parsed:
             if _service.get("tzid") == tzid:
-                return _service
+                return getStateModel(**_service)
         else:
             raise
 
@@ -156,7 +179,7 @@ class OnlineSIM:
         return parsed
 
     @retry_on_connection_issue()
-    async def setOperationOk(self, tzid: int):
+    async def setOperationOk(self, tzid: int) -> getStateModel:
         url = "https://onlinesim.ru/api/setOperationOk.php"
         params = {
             "apikey": self.__api_key,
@@ -174,6 +197,29 @@ class OnlineSIM:
         while True:
             await asyncio.sleep(waiting_time)
             await self._countries_list()
+            ic("Ok!")
+            break
+
+    async def update_number_count(self, country_code, service_code, new_count: int = 0):
+        country_code, service_code = str(country_code), str(service_code)
+        _cache_key = str({"number_stats": str(country_code)})
+        _result = self._cache[_cache_key][service_code]
+
+        _result.update({"count": new_count})
+
+        self._cache[_cache_key][service_code] = _result
+
+    async def fuzzy_country_search(self, search_text):
+        countries_list_ru = await self.countries_list()
+        return process.extractBests(search_text, countries_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
+
+    async def fuzzy_services_search(self, country_code, search_text):
+        services_list_ru = {}
+
+        for service_code, service in (await self.number_stats(country_code)).items():
+            services_list_ru.update({service_code: service["service"]})
+
+        return process.extractBests(search_text, services_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
 
     async def shutdown(self):
         await self.session.close()

@@ -31,17 +31,22 @@ cancel_task_cb = CallbackData("cancel_task", "tzid")
 paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
 countries_page_navigation_cb = CallbackData("countries_page_navigation", "pages")
-services_page_navigation_cb = CallbackData("services_page_navigation", "country_code" "pages")
+services_page_navigation_cb = CallbackData("services_page_navigation", "country_code", "pages")
+# country_search_cb = CallbackData("country_search")
+service_search_cb = CallbackData("service_search", "country_code")
 
-
-class ReciveSMS(StatesGroup):
-    waiting_country = State()
-    waiting_service = State()
+# class ReciveSMS(StatesGroup):
+#     waiting_country = State()
+#     waiting_service = State()
 
 
 class PaymentMethod(StatesGroup):
     waiting_amount = State()
     waiting_method = State()
+
+
+class Search(StatesGroup):
+    waiting_search_text = State()
 
 
 @dp.callback_query_handler(text="main")
@@ -130,8 +135,10 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     await call.answer()
 
 
-@dp.callback_query_handler(country_services_cb.filter())
-async def country_services_message(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(country_services_cb.filter(), state='*')
+async def country_services_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    await state.finish()
+
     page = int(callback_data["page"])
     country_code = callback_data["country_code"]
     services_list = await sim_service.number_stats(country_code)
@@ -145,13 +152,16 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
         service_btn = types.InlineKeyboardButton(f"{service['service']} ({service['count']})", callback_data=service_cb.new(country_code, service_code))
         keyboard_markup.insert(service_btn)
 
+    search_btn = types.InlineKeyboardButton("🔍 Поиск", callback_data=service_search_cb.new(country_code))
+    keyboard_markup.add(search_btn)
+
     plagination_keyboard_list = []
 
     if page > 1:
         previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=country_services_cb.new(page - 1, country_code))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=plagination_pages_cb.new("services", pages_number))
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=services_page_navigation_cb.new(country_code, pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
@@ -165,6 +175,61 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
 
     await call.message.edit_caption(f"🌍 Выбранная страна: {country}\n2. Веберите сервис, от которого вам необходимо принять СМС", reply_markup=keyboard_markup)
     await call.answer()
+
+
+@dp.callback_query_handler(services_page_navigation_cb.filter())
+async def services_page_navigation_message(call: types.CallbackQuery, callback_data: dict):
+    pages = int(callback_data["pages"])
+    country_code = int(callback_data["country_code"])
+
+    keyboard_markup = types.InlineKeyboardMarkup(row_width=5)
+    for page in range(pages):
+        page_btn = types.InlineKeyboardButton(page + 1, callback_data=country_services_cb.new(page + 1, country_code))
+        keyboard_markup.insert(page_btn)
+
+    keyboard_markup = types.InlineKeyboardMarkup()
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    keyboard_markup.add(back_btn)
+
+    await call.message.edit_caption("📖 Пожалуйста, выберите страницу", reply_markup=keyboard_markup)
+    await call.answer()
+
+
+@dp.callback_query_handler(service_search_cb.filter())
+async def service_search_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    country_code = int(callback_data["country_code"])
+
+    keyboard_markup = types.InlineKeyboardMarkup()
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    keyboard_markup.add(back_btn)
+
+    await call.message.edit_caption("🔍 Введите название сервиса для поиска в оригинальном названии без транслита. Например: telegram", reply_markup=keyboard_markup)
+    await Search.waiting_search_text.set()
+    await state.update_data({"country_code": country_code})
+    await call.answer()
+
+
+@dp.message_handler(state=Search.waiting_search_text)
+async def service_search_result_message(msg: types.Message, state: FSMContext):
+    search_text = msg.text
+
+    user_data = await state.get_data()
+    country_code = user_data["country_code"]
+
+    search_results = await sim_service.fuzzy_services_search(country_code, search_text)
+
+    keyboard_markup = types.InlineKeyboardMarkup()
+
+    for search_result in search_results[:15]:
+        result_btn = types.InlineKeyboardButton(f"{search_result[0]} ({search_result[1]}%)", callback_data=service_cb.new(country_code, search_result[2]))
+        keyboard_markup.add(result_btn)
+
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    keyboard_markup.add(back_btn)
+
+    await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
+
+    await state.finish()
 
 
 @dp.callback_query_handler(service_cb.filter())
@@ -214,6 +279,8 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
 
     if status == "NO_NUMBER":
         await call.answer("Упс, оказывается номера уже закончились", True)
+        await sim_service.update_number_count(country_code, service_code)
+        await service_message(call, callback_data)
         return
     elif status in ["WARNING_LOW_BALANCE"]:
         await call.answer("Извините, что-то пошло не так", True)
@@ -225,12 +292,12 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
 
     try:
         service_status = await sim_service.getState(tzid)
+        ic(service_status)
     except Exception:
         await call.answer("Извините, что-то пошло не так", True)
-        return
         raise
 
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status.get('number'))
+    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status.number)
     user.update(balance=user_balance - service_price)
     if user.reffer_id is not None:
         _referral_amount = 0.25
@@ -299,15 +366,10 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         return
 
     if task:
-        msg_raw = []
-
-        for _msg in task.get("msg", []):
-            __received_msg = _msg.get("msg", "")
-            msg_raw.append(__received_msg)
-
-        time = task.get("time", 0)
-        number = task.get('number')
-        service_response = task.get("response")
+        msg_raw = task.msg
+        time = task.time
+        number = task.number
+        service_response = task.response
     else:
         msg_raw = task_info.msg
         time = 0
@@ -387,21 +449,15 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     #     return
 
     if task:
-        msg_raw = task.get("msg", [])
-        service_response = task.get("response")
+        msg = task.msg
+        service_response = task.response
     else:
-        msg_raw = task_info.msg
+        msg = task_info.msg
         service_response = None
-
-    msg_raw = []
 
     if not msg:
         user = User.where(user_id=call.message.chat.id).first()
         user.update(balance=user.balance + task_info.price)
-    else:
-        for _msg in msg:
-            __received_msg = _msg.get("msg", "")
-            msg_raw.append(__received_msg)
 
     if service_response in ["TZ_OVER_OK", "TZ_NUM_ANSWER"]:
         _task_status = OnlinesimStatus.success
@@ -413,7 +469,7 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         ic(f"Unknown task status: {service_response}")
         _task_status = OnlinesimStatus.cancel
 
-    task_info.update(msg=msg_raw, status=_task_status)
+    task_info.update(msg=msg, status=_task_status)
 
     close_task_info = await sim_service.setOperationOk(tzid)
     await task_manager_message(call, callback_data)
