@@ -46,7 +46,8 @@ class PaymentMethod(StatesGroup):
 
 
 class Search(StatesGroup):
-    waiting_search_text = State()
+    waiting_service_search_text = State()
+    waiting_country_search_text = State()
 
 
 @dp.callback_query_handler(text="main")
@@ -80,7 +81,7 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
     keyboard.row(information_btn)
 
     message_text = [
-        f"Привет, {msg.from_user.first_name}!",
+        f"Привет, {msg.chat.full_name}!",
         "При помощи этого бота ты можешь принимать сообщения на номера, который я дам, тем самым регистрироваться на разных сайтах и соц.сетях"
     ]
     if msg_type == "answer":
@@ -97,12 +98,49 @@ async def countries_page_navigation__message(call: types.CallbackQuery, callback
     for page in range(pages):
         page_btn = types.InlineKeyboardButton(page + 1, callback_data=countries_cb.new(page + 1))
         keyboard_markup.insert(page_btn)
+
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
+    keyboard_markup.add(back_btn)
+
     await call.message.edit_caption("📖 Пожалуйста, выберите страницу", reply_markup=keyboard_markup)
     await call.answer()
 
 
-@dp.callback_query_handler(countries_cb.filter())
+@dp.callback_query_handler(text="country_search")
+async def country_search_message(call: types.CallbackQuery, state: FSMContext):
+    keyboard_markup = types.InlineKeyboardMarkup()
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
+    keyboard_markup.add(back_btn)
+
+    await call.message.edit_caption("🔍 Введите название страны для поиска в оригинальном названии без транслита. Например: Россия", reply_markup=keyboard_markup)
+    await Search.waiting_country_search_text.set()
+    await call.answer()
+
+
+@dp.message_handler(state=Search.waiting_country_search_text)
+async def country_search_result_message(msg: types.Message, state: FSMContext):
+    search_text = msg.text
+
+    search_results = await sim_service.fuzzy_countries_search(search_text)
+
+    keyboard_markup = types.InlineKeyboardMarkup()
+
+    for search_result in search_results[:15]:
+        result_btn = types.InlineKeyboardButton(f"{search_result[0]} ({search_result[1]}%)", callback_data=country_services_cb.new(page=1, country_code=search_result[2]))
+        keyboard_markup.add(result_btn)
+
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(page=1))
+    keyboard_markup.add(back_btn)
+
+    await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
+
+    await state.finish()
+
+
+@dp.callback_query_handler(countries_cb.filter(), state="*")
 async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMContext, callback_data: dict):
+    await state.finish()
+
     page = int(callback_data["page"])
     countries_list = await sim_service.countries_list()
     pages_number = math.ceil(float(len(countries_list)) / float(15))
@@ -112,6 +150,9 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
         summary_numbers = await sim_service.summary_numbers_count(country_code)
         country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=country_services_cb.new(1, country_code))
         keyboard_markup.insert(country_btn)
+
+    search_btn = types.InlineKeyboardButton("🔍 Поиск", callback_data="country_search")
+    keyboard_markup.add(search_btn)
 
     plagination_keyboard_list = []
 
@@ -187,7 +228,6 @@ async def services_page_navigation_message(call: types.CallbackQuery, callback_d
         page_btn = types.InlineKeyboardButton(page + 1, callback_data=country_services_cb.new(page + 1, country_code))
         keyboard_markup.insert(page_btn)
 
-    keyboard_markup = types.InlineKeyboardMarkup()
     back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
     keyboard_markup.add(back_btn)
 
@@ -204,12 +244,12 @@ async def service_search_message(call: types.CallbackQuery, callback_data: dict,
     keyboard_markup.add(back_btn)
 
     await call.message.edit_caption("🔍 Введите название сервиса для поиска в оригинальном названии без транслита. Например: telegram", reply_markup=keyboard_markup)
-    await Search.waiting_search_text.set()
+    await Search.waiting_service_search_text.set()
     await state.update_data({"country_code": country_code})
     await call.answer()
 
 
-@dp.message_handler(state=Search.waiting_search_text)
+@dp.message_handler(state=Search.waiting_service_search_text)
 async def service_search_result_message(msg: types.Message, state: FSMContext):
     search_text = msg.text
 

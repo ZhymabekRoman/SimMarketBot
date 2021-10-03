@@ -207,7 +207,7 @@ class OnlineSIM:
 
         self._cache[_cache_key][service_code] = _result
 
-    async def fuzzy_country_search(self, search_text):
+    async def fuzzy_countries_search(self, search_text):
         countries_list_ru = await self.countries_list()
         return process.extractBests(search_text, countries_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
 
