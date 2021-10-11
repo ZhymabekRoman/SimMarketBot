@@ -22,7 +22,6 @@ from sqlalchemy.orm import sessionmaker
 
 from aioqiwi.wallet import Wallet
 from bot.services.qiwi import QIWIHistoryPoll
-from bot.services.converter import CurrencyConverter
 from bot.services.onlinesim import OnlineSIM
 from bot.services.yoomoney import Client, YooMoneyHistoryPoll
 
@@ -68,5 +67,4 @@ qiwi_poller = QIWIHistoryPoll(
 yoomoney_client = Client(config.YOOMONEY_TOKEN)
 yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
-currency_converter = CurrencyConverter(base64_decode(config.EXCHANGE_RATE_API_TOKEN))
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)

@@ -33,8 +33,6 @@ async def main():
     qiwi_wallet = input("Введите номер кошелька, куда вы хотите получать деньги, в формате +7xxxxxxxxxx (например - +79001234567): ")
     qiwi_api_token = input("Введите QIWI API токен. Токен вы можете получить по адресу https://qiwi.com/api : ")
 
-    exchangerate_rate_token = input("Введите ExchangeRate API токен. Токен вы можете получить по адресу https://app.exchangerate-api.com/sign-up : ")
-
     onlinesim_api_token = input("Введите Online SIM API токен: Токен вы можете получить по адресу https://onlinesim.ru/v2/pages/profile : ")
 
     commission_amount = float(input("Введите процент комисси на цены (for example - 100): "))
@@ -55,8 +53,6 @@ async def main():
         file.write(f"QIWI_API_TOKEN = '{base64_encode(qiwi_api_token)}'\n")
         file.write("# Declare commission amount\n")
         file.write(f"COMMISSION_AMOUNT = {commission_amount}\n")
-        file.write("# Declare ExchangeRate API token\n")
-        file.write(f"EXCHANGE_RATE_API_TOKEN = '{base64_encode(exchangerate_rate_token)}'\n")
         file.write("# Declare Online SIM service API tolen\n")
         file.write(f"ONLINE_SIM_API_TOKEN = '{base64_encode(onlinesim_api_token)}'")
         file.write("# Declare Admin username with @\n")

@@ -1,4 +1,4 @@
-from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, currency_converter, yoomoney_poller
+from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller
 
 from bot.events import qiwi_payment
 from bot.handlers import admin
@@ -37,9 +37,6 @@ async def on_bot_startup(dp: Dispatcher):
     logger.info("Register bot commands ...")
     await dp.bot.set_my_commands(commands)
 
-    # if not sim_service._cache.get("countries_list"):
-    #     await sim_service.cache_updater(waiting_time=0)
-
     loop.create_task(poll_manager())
 
 
@@ -47,7 +44,6 @@ async def on_bot_shutdown(dp: Dispatcher):
     logger.info("Close sessions ...")
     await qiwi_wallet.close()
     await sim_service.shutdown()
-    await currency_converter.shutdown()
 
 
 # Start Telegram bot polling
