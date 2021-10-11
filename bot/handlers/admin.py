@@ -7,7 +7,7 @@ from bot import dp
 from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
-from bot.utils.make_tarfile import aiomake_tarfile
+from bot.utils.zip import aio_make_zip_file
 from bot.utils.bidirectional_iterator import BidirectionalIterator
 
 import os
@@ -70,11 +70,11 @@ async def admin_panel_message(message: types.Message, msg_type="answer"):
 @dp.callback_query_handler(text='make_backup')
 async def make_backup_message(call: types.CallbackQuery):
     await call.answer("Процесс резервного копирования начат, ожидайте ...", True)
-    now = datetime.now()
-    date_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
-    created_tarfile = await aiomake_tarfile(f"ActiVision_backup_{date_time_str}", "bot/user_data/")
-    await call.bot.send_document(call.from_user.id, types.InputFile(created_tarfile))
-    os.remove(created_tarfile)
+    time_now = datetime.now()
+    date_time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
+    created_backup_file = await aio_make_zip_file(f"ActiVision_backup_{date_time_str}", "bot/user_data/")
+    await call.bot.send_document(call.from_user.id, types.InputFile(created_backup_file))
+    os.remove(created_backup_file)
 
 
 @dp.callback_query_handler(text='change_user_balance', state='*')
