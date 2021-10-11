@@ -3,7 +3,7 @@ import aiohttp
 import asyncio
 
 from bot.utils.json_storager import JSONCacher
-from bot.utils.country2flag import countries_flags_dict
+from bot.utils.country2flag import Country2Flag
 from bot.utils.retry import retry_on_connection_issue
 
 from fuzzywuzzy import process, fuzz
@@ -57,7 +57,7 @@ class OnlineSIM:
         _result = {}
         for country_code, country in parsed.items():
             if country["visible"] == 1 and await self._summary_numbers_count(country_code) != 0:
-                _result.update({country_code: f'{countries_flags_dict.get(country_code, "")} {country["rus"]}'})
+                _result.update({country_code: f'{Country2Flag().get(country_code)} {country["rus"]}'})
 
         async with self.lock:
             self._cache["countries_list"] = _result

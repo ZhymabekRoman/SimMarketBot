@@ -17,15 +17,6 @@ CONFIG_DIR = os.path.join("bot", "user_data")
 async def main():
     print("Добро пожаловать! Вас приветствует мастер по конфигурации Телеграм бота 'Sim Market Bot'!")
 
-    # Создаём папку где будут храниться конфигурационные данные
-    os.makedirs(CONFIG_DIR)
-
-    with open(os.path.join(CONFIG_DIR, "database.db"), "w") as file:
-        pass
-
-    with open(os.path.join(CONFIG_DIR, "__init__.py"), "w") as file:
-        pass
-
     bot_api_token = input("Пожалуйста ведите Bot API токен Телеграм бота: ")
 
     tech_admin_user_id = int(input("Введите Telegram user id главного администратора: "))
@@ -35,12 +26,21 @@ async def main():
 
     onlinesim_api_token = input("Введите Online SIM API токен: Токен вы можете получить по адресу https://onlinesim.ru/v2/pages/profile : ")
 
-    commission_amount = float(input("Введите процент комисси на цены (for example - 100): "))
+    commission_amount = float(input("Введите процент комисси на цены. Например - 100: "))
 
     admin_username = input("Введите юзернем админа, который будет отвечать за мониторингом пополнение баланса, с знаком @ (например - @example): ")
 
     yoomoney_receiver = input("Введите YooMoney адрес кошелька куда вы хотите получать деньги: ")
     yoomoney_token = input("Введите YooMoney токен (ТОКЕН!): ")
+
+    # Создаём папку где будут храниться конфигурационные данные
+    os.makedirs(CONFIG_DIR)
+
+    with open(os.path.join(CONFIG_DIR, "database.db"), "w") as file:
+        pass
+
+    with open(os.path.join(CONFIG_DIR, "__init__.py"), "w") as file:
+        pass
 
     with open(os.path.join(CONFIG_DIR, "config.py"), "w") as file:
         file.write("# Declare Telegram Bot API token\n")
