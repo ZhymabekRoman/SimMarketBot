@@ -644,7 +644,7 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
 async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     amount = callback_data.get("amount", 700)
 
-    qiwi_payment_comment = f"ActiVision-{call.message.chat.id}"
+    qiwi_payment_comment = f"{config.BOT_NAME}-{call.message.chat.id}"
     qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, qiwi_payment_comment, 643, ["account", "comment"], 0)
 
     keyboard = types.InlineKeyboardMarkup()
@@ -672,8 +672,8 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_da
 async def refill_balance_via_yoomoney_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     amount = callback_data.get("amount", 700)
 
-    yoomoney_payment_label = f"ActiVision-{call.message.chat.id}"
-    yoomoney_payment_link = generate_yoomoney_payment_form_link(config.YOOMONEY_RECEIVER, "Пополнение баланс бота ActiVision", yoomoney_payment_label, amount)
+    yoomoney_payment_label = f"{config.BOT_NAME}-{call.message.chat.id}"
+    yoomoney_payment_link = generate_yoomoney_payment_form_link(config.YOOMONEY_RECEIVER, f"Пополнение баланс бота {config.BOT_NAME}", yoomoney_payment_label, amount)
 
     keyboard = types.InlineKeyboardMarkup()
     payement_yoomoney_btn = types.InlineKeyboardButton("Перейти к оплате", yoomoney_payment_link)
@@ -704,7 +704,7 @@ async def check_referrals(call: types.CallbackQuery):
     bot_username = (await call.bot.me).username
     bot_link = f"https://t.me/{bot_username}?start={call.message.chat.id}"
     _frwd_telegram_url = "https://t.me/share/url"
-    _frwd_telegram_params = {"url": bot_link, "text": "ActiVision - сервис для приёма SMS сообщений"}
+    _frwd_telegram_params = {"url": bot_link, "text": f"{config.BOT_NAME} - сервис для приёма SMS сообщений"}
     _frwd_telegram_req = PreparedRequest()
     _frwd_telegram_req.prepare_url(_frwd_telegram_url, _frwd_telegram_params)
     forward_url = _frwd_telegram_req.url
@@ -739,7 +739,7 @@ async def information_message(call: types.CallbackQuery):
     keyboard.add(news_btn)
     keyboard.add(back_btn)
     message_text = [
-        "ActiVision - уникальный сервис для приёма SMS сообщений",
+        f"{config.BOT_NAME} - уникальный сервис для приёма SMS сообщений",
         "",
         "Наши преимущества:",
         "✔️ Низкие цены",

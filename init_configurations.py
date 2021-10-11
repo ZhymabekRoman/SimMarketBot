@@ -17,6 +17,8 @@ CONFIG_DIR = os.path.join("bot", "user_data")
 async def main():
     print("Добро пожаловать! Вас приветствует мастер по конфигурации Телеграм бота 'Sim Market Bot'!")
 
+    bot_name = input("Введите название бота: ")
+
     bot_api_token = input("Пожалуйста ведите Bot API токен Телеграм бота: ")
 
     tech_admin_user_id = int(input("Введите Telegram user id главного администратора: "))
@@ -43,6 +45,8 @@ async def main():
         pass
 
     with open(os.path.join(CONFIG_DIR, "config.py"), "w") as file:
+        file.write("# Declare bot name\n")
+        file.write(f"BOT_NAME = '{bot_name}'\n")
         file.write("# Declare Telegram Bot API token\n")
         file.write(f"API_TOKEN = '{base64_encode(bot_api_token)}'\n")
         file.write("# Declare main admin user id\n")

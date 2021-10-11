@@ -73,7 +73,7 @@ async def make_backup_message(call: types.CallbackQuery):
     await call.answer("Процесс резервного копирования начат, ожидайте ...", True)
     time_now = datetime.now()
     date_time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
-    created_backup_file = await aio_make_zip_file(f"ActiVision_backup_{date_time_str}", "bot/user_data/")
+    created_backup_file = await aio_make_zip_file(f"{config.BOT_NAME}_backup_{date_time_str}", "bot/user_data/")
     await call.bot.send_document(call.from_user.id, types.InputFile(created_backup_file))
     os.remove(created_backup_file)
 
