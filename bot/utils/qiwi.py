@@ -36,7 +36,7 @@ def sources_list(sources, params, name='sources'):
     return params
 
 
-def generate_qiwi_payment_form_link(pid: str, account: str, amount: str, comment: str, currency: int = 643, blocked: list = None, account_type=None):
+def generate_qiwi_payment_form_link(pid: str, account: str, amount: float, comment: str, currency: int = 643, blocked: list = None, account_type=None):
     """
     Создание автозаполненной платежной формы. Код адаптирован из pyqiwi: https://github.com/mostm/pyqiwi/blob/master/pyqiwi/__init__.py
     Parameters
@@ -75,8 +75,8 @@ def generate_qiwi_payment_form_link(pid: str, account: str, amount: str, comment
     url = "https://qiwi.com/payment/form/{0}".format(pid)
     params = {"currency": currency}
     params = utils.merge_dicts(params, split_float(amount))
-    if amount > 99999:
-        raise ValueError('amount не может превышать 99999 из-за ограничений на один платеж внутри QIWI')
+    # if amount > 99999:
+    #     raise ValueError('amount не может превышать 99999 из-за ограничений на один платеж внутри QIWI')
     if pid == "99" and comment:
         params["extra['comment']"] = comment
     if account:

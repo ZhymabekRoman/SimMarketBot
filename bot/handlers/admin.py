@@ -8,6 +8,7 @@ from bot.user_data import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.utils.zip import aio_make_zip_file
+from bot.utils.utils import is_digit
 from bot.utils.bidirectional_iterator import BidirectionalIterator
 
 import os
@@ -105,7 +106,7 @@ async def change_user_balance_step1_message(message: types.Message, state: FSMCo
 
 @dp.message_handler(state=ChangeBalance.waiting_new_balance, content_types=types.ContentTypes.TEXT)
 async def change_user_balance_step2_message(message: types.Message, state: FSMContext):
-    if not message.text.isdigit():
+    if not is_digit(message.text):
         await message.reply("Баланс пользывателя должен быть в цифрах", reply_markup=await generate_back_keyboard())
         return
 

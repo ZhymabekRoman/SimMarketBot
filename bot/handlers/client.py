@@ -13,6 +13,7 @@ from bot.utils.qiwi import generate_qiwi_payment_form_link
 from bot.utils.yoomoney import generate_yoomoney_payment_form_link
 from bot.utils.timedelta import readable_timedelta
 from bot.utils.sms_code import mark_sms_code
+from bot.utils.utils import is_digit
 
 import os
 import pytz
@@ -601,7 +602,7 @@ async def refill_balance_amount_callback(call: types.CallbackQuery, callback_dat
 async def refill_balance_amount_message(msg: types.Message, state: FSMContext):
     amount = msg.text
 
-    if not amount.isdigit():
+    if not is_digit(amount):
         keyboard = types.InlineKeyboardMarkup()
         back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
         keyboard.add(back_btn)
@@ -641,7 +642,7 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
 
 @dp.callback_query_handler(refill_balance_via_cb.filter(method=["qiwi"]), state=PaymentMethod.waiting_method)
 async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
-    amount = int(callback_data.get("amount", 700))
+    amount = callback_data.get("amount", 700)
 
     qiwi_payment_comment = f"ActiVision-{call.message.chat.id}"
     qiwi_payment_link = generate_qiwi_payment_form_link("99", config.QIWI_WALLET, amount, qiwi_payment_comment, 643, ["account", "comment"], 0)
@@ -669,7 +670,7 @@ async def refill_balance_via_qiwi_message(call: types.CallbackQuery, callback_da
 
 @dp.callback_query_handler(refill_balance_via_cb.filter(method=["yoomoney"]), state=PaymentMethod.waiting_method)
 async def refill_balance_via_yoomoney_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
-    amount = int(callback_data.get("amount", 700))
+    amount = callback_data.get("amount", 700)
 
     yoomoney_payment_label = f"ActiVision-{call.message.chat.id}"
     yoomoney_payment_link = generate_yoomoney_payment_form_link(config.YOOMONEY_RECEIVER, "Пополнение баланс бота ActiVision", yoomoney_payment_label, amount)
