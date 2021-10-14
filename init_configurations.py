@@ -1,5 +1,7 @@
 import os
 import asyncio
+from aiogram.types import InputFile
+from aiogram import Bot
 import base64
 
 from config import TomlConfig
@@ -14,6 +16,16 @@ def base64_encode(message: str) -> str:
 
 CONFIG_DIR = os.path.join("bot", "user_data")
 
+async def get_image_board_file_id(bot_api_token: str, tech_admin_user_id: int) -> str:
+    bot = Bot(token=bot_api_token)
+
+    image_msg = await bot.send_photo(tech_admin_user_id, InputFile("images/board_image.jpg"))
+    file_id = image_msg.photo[-1].file_id
+
+    await bot.close()
+
+    return file_id
+
 
 async def main():
     print("Добро пожаловать! Вас приветствует мастер по конфигурации Телеграм бота 'Sim Market Bot'!")
@@ -23,6 +35,8 @@ async def main():
     bot_api_token = input("Пожалуйста ведите Bot API токен Телеграм бота: ")
 
     tech_admin_user_id = int(input("Введите Telegram user id главного администратора: "))
+
+    board_image_file_id = await get_image_board_file_id(bot_api_token, tech_admin_user_id)
 
     qiwi_wallet = input("Введите номер кошелька, куда вы хотите получать деньги, в формате +7xxxxxxxxxx (например - +79001234567): ")
     qiwi_api_token = input("Введите QIWI API токен. Токен вы можете получить по адресу https://qiwi.com/api : ")
@@ -47,6 +61,7 @@ async def main():
     config.BOT_NAME = bot_name
     config.API_TOKEN = base64_encode(bot_api_token)
     config.ADMIN_ID = tech_admin_user_id
+    config.BOARD_IMAGE_FILE_ID = board_image_file_id
     config.QIWI_WALLET = qiwi_wallet
     config.QIWI_API_TOKEN = base64_encode(qiwi_api_token)
     config.COMMISSION_AMOUNT = commission_amount

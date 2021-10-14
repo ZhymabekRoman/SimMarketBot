@@ -15,7 +15,6 @@ from bot.utils.timedelta import readable_timedelta
 from bot.utils.sms_code import mark_sms_code
 from bot.utils.utils import is_digit
 
-import os
 import pytz
 import datetime
 import math
@@ -84,7 +83,7 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
         "При помощи этого бота ты можешь принимать сообщения на номера, который я дам, тем самым регистрироваться на разных сайтах и соц.сетях"
     ]
     if msg_type == "answer":
-        await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption='\n'.join(message_text), reply_markup=keyboard)
+        await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption='\n'.join(message_text), reply_markup=keyboard)
     elif msg_type == "edit":
         await msg.edit_caption("\n".join(message_text), reply_markup=keyboard)
 
@@ -131,7 +130,7 @@ async def country_search_result_message(msg: types.Message, state: FSMContext):
     back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(page=1))
     keyboard_markup.add(back_btn)
 
-    await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
+    await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
 
     await state.finish()
 
@@ -266,7 +265,7 @@ async def service_search_result_message(msg: types.Message, state: FSMContext):
     back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
     keyboard_markup.add(back_btn)
 
-    await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
+    await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
 
     await state.finish()
 
@@ -603,7 +602,7 @@ async def refill_balance_amount_message(msg: types.Message, state: FSMContext):
         keyboard = types.InlineKeyboardMarkup()
         back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
         keyboard.add(back_btn)
-        await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption="Баланс пользывателя должен быть в цифрах", reply_markup=keyboard)
+        await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption="Баланс пользывателя должен быть в цифрах", reply_markup=keyboard)
         return
 
     await state.update_data({"amount": amount})
@@ -632,7 +631,7 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
     if msg_type == "edit":
         await msg.edit_caption('\n'.join(message_text), reply_markup=keyboard)
     elif msg_type == "answer":
-        await msg.answer_photo(types.InputFile(os.path.join("bot", "images", "main.jpg")), caption='\n'.join(message_text), reply_markup=keyboard)
+        await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption='\n'.join(message_text), reply_markup=keyboard)
 
     await PaymentMethod.waiting_method.set()
 
