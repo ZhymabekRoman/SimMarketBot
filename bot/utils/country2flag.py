@@ -1,3 +1,5 @@
+from loguru import logger
+
 
 class Country2Flag:
     # This list of countries taken from OnlineSim's API page documentation: https://onlinesim.ru/docs/api/ru/sms/getNumbersStats#Result
@@ -7,7 +9,6 @@ class Country2Flag:
         country_flag =  self.countries_flags_dict.get(country_code, "")
 
         if not country_flag:
-            # TODO: need log this
-            pass
+            logger.error(f"Unknown country id: {country_code}")
 
         return country_flag

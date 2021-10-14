@@ -1,13 +1,12 @@
 from aioqiwi.wallet import enums
 
 import datetime
-import logging
+from loguru import logger
 import asyncio
 import pytz
 
 from bot.utils.retry import retry_on_connection_issue
 
-logger = logging.getLogger("qiwi_poller")
 
 
 class QIWIHistoryPoll:

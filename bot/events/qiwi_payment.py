@@ -7,15 +7,15 @@ from aioqiwi.wallet import types as aioqiwi_types
 from aiogram.utils.markdown import hlink
 from aiogram import types
 
-from icecream import ic
+from loguru import logger
 
 
 @qiwi_wallet.hm()
 async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
 
-    ic("New QIWI payment!")
+    logger.debug("New QIWI payment!")
     if Refill.where(txn_id=payment.txn_id).first():
-        ic("Same payment is found, just ignore...")
+        logger.debug("Same payment is found, just ignore...")
         return
 
     if payment.sum.currency == 643:
@@ -41,10 +41,6 @@ async def qiwi_payment_event_handler(payment: aioqiwi_types.PaymentData):
     ]
 
     if not payment.comment or not payment.comment.startswith("ActiVision-") or not payment.comment.replace("ActiVision-", "").isdigit():
-        ic("first if tree")
-        ic(not payment.comment)
-        ic(not payment.comment.startswith("ActiVision-"))
-        ic(not payment.comment.replace("ActiVision-", "").isdigit())
         return
 
     user_id = int(payment.comment.replace("ActiVision-", ""))

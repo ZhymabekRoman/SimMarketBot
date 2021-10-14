@@ -19,9 +19,8 @@ import os
 import pytz
 import datetime
 import math
+from loguru import logger
 from requests.models import PreparedRequest
-
-from icecream import ic
 
 countries_cb = CallbackData("countries", "page")
 country_services_cb = CallbackData("country_services", "page", "country_code")
@@ -33,7 +32,6 @@ paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
 countries_page_navigation_cb = CallbackData("countries_page_navigation", "pages")
 services_page_navigation_cb = CallbackData("services_page_navigation", "country_code", "pages")
-# country_search_cb = CallbackData("country_search")
 service_search_cb = CallbackData("service_search", "country_code")
 
 # class ReciveSMS(StatesGroup):
@@ -333,7 +331,6 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
 
     try:
         service_status = await sim_service.getState(tzid)
-        ic(service_status)
     except Exception:
         await call.answer("Извините, что-то пошло не так", True)
         raise
@@ -507,7 +504,7 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     elif service_response == "TZ_OVER_EMPTY":
         _task_status = OnlinesimStatus.expire
     else:
-        ic(f"Unknown task status: {service_response}")
+        logger.error(f"Unknown task status: {service_response}")
         _task_status = OnlinesimStatus.cancel
 
     task_info.update(msg=msg, status=_task_status)

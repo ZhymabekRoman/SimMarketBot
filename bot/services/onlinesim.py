@@ -6,10 +6,9 @@ from bot.utils.json_storager import JSONCacher
 from bot.utils.country2flag import Country2Flag
 from bot.utils.retry import retry_on_connection_issue
 
+from loguru import logger
 from fuzzywuzzy import process, fuzz
 from pydantic import BaseModel, validator
-
-from icecream import ic
 
 
 class getStateModel(BaseModel):
@@ -117,7 +116,7 @@ class OnlineSIM:
             result = await response.text()
             parsed = json.loads(result)
 
-        ic(parsed)
+        logger.debug(parsed)
 
         status = parsed.get("response")
         tzid = parsed.get("tzid")
@@ -150,7 +149,7 @@ class OnlineSIM:
             result = await response.text()
             parsed = json.loads(result)
 
-        ic(parsed)
+        logger.debug(parsed)
 
         if isinstance(parsed, dict):
             if parsed.get("response") == "ERROR_NO_OPERATIONS":
@@ -174,7 +173,7 @@ class OnlineSIM:
             result = await response.text()
             parsed = json.loads(result)
 
-        ic(parsed)
+        logger.debug(parsed)
 
         return parsed
 
@@ -189,7 +188,7 @@ class OnlineSIM:
             result = await response.text()
             parsed = json.loads(result)
 
-        ic(parsed)
+        logger.debug(parsed)
 
         return parsed
 

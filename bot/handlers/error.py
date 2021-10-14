@@ -1,14 +1,13 @@
-from aiogram.utils.exceptions import BotBlocked, MessageNotModified
 from aiogram import types
+from loguru import logger
 
 from bot import dp
 
-# from icecream import ic
 
-# @dp.errors_handler(exception=BotBlocked)
-# async def error_bot_blocked(update: types.Update, exception: BotBlocked):
-#     return True
-
-@dp.errors_handler(exception=MessageNotModified)
-async def message_not_modified_handler(update: types.Update, exception: BotBlocked):
+@dp.errors_handler()
+async def errors_handler(update: types.Update, exception: Exception):
+    try:
+        raise exception
+    except Exception as e:
+        logger.exception("Cause exception {e} in update {update}", e=e, update=update)
     return True

@@ -4,6 +4,7 @@ assert os.path.isdir(os.path.join("bot", "user_data")), "Configuration folder is
 
 import asyncio
 import logging
+from loguru import logger
 from importlib import resources
 
 from aiogram.contrib.fsm_storage.files import JSONStorage
@@ -26,9 +27,12 @@ from bot.services.onlinesim import OnlineSIM
 from bot.services.yoomoney import Client, YooMoneyHistoryPoll
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
 logging.getLogger('aiogram').setLevel(logging.WARNING)
+
+# Configure loguru
+logger.add("logs/file_{time}.log", diagnose=False)  # enqueue=True,
 
 # Initalialization API token for work with Telegram Bot
 API_TOKEN = base64_decode(config.API_TOKEN)

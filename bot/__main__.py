@@ -8,11 +8,9 @@ from bot.handlers import error
 from aiogram import Dispatcher, executor
 from aiogram.types import BotCommand
 
-import logging
+from loguru import logger
 import asyncio
 import random
-
-logger = logging.getLogger(__name__)
 
 
 async def poll_manager():
