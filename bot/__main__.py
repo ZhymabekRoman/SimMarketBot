@@ -1,9 +1,6 @@
 from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller
-
+from bot import handlers
 from bot.events import qiwi_payment
-from bot.handlers import admin
-from bot.handlers import client
-from bot.handlers import error
 
 from aiogram import Dispatcher, executor
 from aiogram.types import BotCommand

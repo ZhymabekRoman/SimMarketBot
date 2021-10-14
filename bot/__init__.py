@@ -15,13 +15,13 @@ from bot.models.user import User
 from bot.models.onlinesim import Onlinesim
 from bot.models.refills import Refill
 from bot.utils.base64 import base64_decode
-from bot.user_data import config
 
 import sqlalchemy as sa
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm import sessionmaker
 
 from aioqiwi.wallet import Wallet
+from bot.services import config
 from bot.services.qiwi import QIWIHistoryPoll
 from bot.services.onlinesim import OnlineSIM
 from bot.services.yoomoney import Client, YooMoneyHistoryPoll
@@ -34,7 +34,7 @@ logging.getLogger('aiogram').setLevel(logging.WARNING)
 # Configure loguru
 logger.add("logs/file_{time}.log", diagnose=False)  # enqueue=True,
 
-# Initalialization API token for work with Telegram Bot
+# Initalialization API token for work with Telegram Bot API
 API_TOKEN = base64_decode(config.API_TOKEN)
 
 # Configure FSM Storage

@@ -1,19 +1,17 @@
 import asyncio
 import datetime
-import logging
 import pytz
+from loguru import logger
 
 from .client import Client
 
 from aiogram import types
 from aiogram.utils.markdown import hlink
 
-from bot.user_data import config
+from bot.services import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.utils.retry import retry_on_connection_issue
-
-logger = logging.getLogger("yoomoney-poller")
 
 
 class YooMoneyHistoryPoll:

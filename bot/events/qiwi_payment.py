@@ -1,5 +1,5 @@
 from bot import bot, qiwi_wallet
-from bot.user_data import config
+from bot.services import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 

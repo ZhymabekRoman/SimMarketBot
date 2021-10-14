@@ -4,7 +4,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 
 from bot import dp
-from bot.user_data import config
+from bot.services import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.utils.zip import aio_make_zip_file

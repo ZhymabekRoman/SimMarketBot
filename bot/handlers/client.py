@@ -8,7 +8,7 @@ from bot import bot, dp, sim_service
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
 from bot.models.onlinesim import Onlinesim, OnlinesimStatus
-from bot.user_data import config
+from bot.services import config
 from bot.utils.qiwi import generate_qiwi_payment_form_link
 from bot.utils.yoomoney import generate_yoomoney_payment_form_link
 from bot.utils.timedelta import readable_timedelta

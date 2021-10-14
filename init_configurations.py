@@ -2,6 +2,8 @@ import os
 import asyncio
 import base64
 
+from config import TomlConfig
+
 
 def base64_encode(message: str) -> str:
     """Зашифровывает строку в base64"""
@@ -9,7 +11,6 @@ def base64_encode(message: str) -> str:
     base64_bytes = base64.b64encode(message_bytes)
     base64_message = base64_bytes.decode('ascii')
     return base64_message
-
 
 CONFIG_DIR = os.path.join("bot", "user_data")
 
@@ -41,30 +42,20 @@ async def main():
     with open(os.path.join(CONFIG_DIR, "database.db"), "w") as file:
         pass
 
-    with open(os.path.join(CONFIG_DIR, "__init__.py"), "w") as file:
-        pass
+    config = TomlConfig({})
 
-    with open(os.path.join(CONFIG_DIR, "config.py"), "w") as file:
-        file.write("# Declare bot name\n")
-        file.write(f"BOT_NAME = '{bot_name}'\n")
-        file.write("# Declare Telegram Bot API token\n")
-        file.write(f"API_TOKEN = '{base64_encode(bot_api_token)}'\n")
-        file.write("# Declare main admin user id\n")
-        file.write(f"ADMIN_ID = {tech_admin_user_id}\n")
-        file.write("# Declare QIWI wallet telephone number\n")
-        file.write(f"QIWI_WALLET = '{qiwi_wallet}'\n")
-        file.write("# Declare QIWI API token\n")
-        file.write(f"QIWI_API_TOKEN = '{base64_encode(qiwi_api_token)}'\n")
-        file.write("# Declare commission amount\n")
-        file.write(f"COMMISSION_AMOUNT = {commission_amount}\n")
-        file.write("# Declare Online SIM service API tolen\n")
-        file.write(f"ONLINE_SIM_API_TOKEN = '{base64_encode(onlinesim_api_token)}'")
-        file.write("# Declare Admin username with @\n")
-        file.write(f"ADMIN_USERNAME = '{admin_username}'\n")
-        file.write("# Declare YooMoney wallet\n")
-        file.write(f"YOOMONEY_RECEIVER = '{yoomoney_receiver}'\n")
-        file.write("# Declare YooMoney token\n")
-        file.write(f"YOOMONEY_TOKEN = '{yoomoney_token}'")
+    config.BOT_NAME = bot_name
+    config.API_TOKEN = base64_encode(bot_api_token)
+    config.ADMIN_ID = tech_admin_user_id
+    config.QIWI_WALLET = qiwi_wallet
+    config.QIWI_API_TOKEN = base64_encode(qiwi_api_token)
+    config.COMMISSION_AMOUNT = commission_amount
+    config.ONLINE_SIM_API_TOKEN = base64_encode(onlinesim_api_token)
+    config.ADMIN_USERNAME = admin_username
+    config.YOOMONEY_RECEIVER = yoomoney_receiver
+    config.YOOMONEY_TOKEN = yoomoney_token
+
+    config.export_to_file(os.path.join(CONFIG_DIR, "config.toml"))
 
     print("Готово!")
 
