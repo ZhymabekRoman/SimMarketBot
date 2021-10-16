@@ -3,6 +3,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.utils.callback_data import CallbackData
 from aiogram.utils.markdown import hlink
 from aiogram import types
+from aiogram.utils import exceptions
 
 from bot import bot, dp, sim_service
 from bot.models.user import User
@@ -20,6 +21,7 @@ import datetime
 import math
 from loguru import logger
 from requests.models import PreparedRequest
+from contextlib import suppress
 
 countries_cb = CallbackData("countries", "page")
 country_services_cb = CallbackData("country_services", "page", "country_code")
@@ -50,7 +52,8 @@ class Search(StatesGroup):
 
 @dp.callback_query_handler(text="main")
 async def main_menu_btn_message(call: types.CallbackQuery):
-    await main_menu_message(call.message, "edit")
+    with suppress(exceptions.MessageNotModified):
+        await main_menu_message(call.message, "edit")
     await call.answer()
 
 
@@ -361,10 +364,9 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
             countries_list = await sim_service.countries_list()
             services_list = await sim_service.number_stats(task.country_code)
 
-            service = services_list.get(task.service_code)
-            country = countries_list.get(task.country_code)
-
-            task_btn = types.InlineKeyboardButton(f"{task.id} | {service['service']} | {country}", callback_data=task_manager_cb.new(task.tzid))
+            service = services_list.get(task.service_code, {})
+            country = countries_list.get(task.country_code, {})
+            task_btn = types.InlineKeyboardButton(f"{task.id} | {service.get('service', 'Неизвестно')} | {country}", callback_data=task_manager_cb.new(task.tzid))
             keyboard.add(task_btn)
 
     active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data="active_tasks")
@@ -387,7 +389,8 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
 
     message_text = f"{task_type_name} операции ({len(user_operations)}):"
 
-    await call.message.edit_caption(message_text, reply_markup=keyboard)
+    with suppress(exceptions.MessageNotModified):
+        await call.message.edit_caption(message_text, reply_markup=keyboard)
     await call.answer()
 
 
@@ -416,8 +419,8 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     countries_list = await sim_service.countries_list()
     services_list = await sim_service.number_stats(task_info.country_code)
 
-    service = services_list.get(task_info.service_code)
-    country = countries_list.get(task_info.country_code)
+    service = services_list.get(task_info.service_code, {})
+    country = countries_list.get(task_info.country_code, {})
 
     if task_info.status == OnlinesimStatus.waiting:
         status = "Активно"
@@ -447,7 +450,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ ID опреации: {task_info.id}",
         f"▫️ Номер телефона: {number}",
         f"▫️ Страна: {country}",
-        f"▫️ Сервис: {service.get('service')}",
+        f"▫️ Сервис: {service.get('service', 'Неизвестно')}",
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
         f"▫️ Длительность действия номера: {expirity}",
@@ -456,10 +459,8 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"{msg}"
     ]
 
-    try:
+    with suppress(exceptions.MessageNotModified):
         await call.message.edit_caption('\n'.join(message_text), reply_markup=keyboard, parse_mode=types.ParseMode.HTML)
-    except Exception:
-        pass
 
     await call.answer()
 
@@ -626,7 +627,7 @@ async def refill_balance_method_message(msg: types.Message, state: FSMContext, m
         f"Текущая сумма пополнения: {amount}",
         "",
         "Выберите один из способов пополнения",
-        f"Если они вам по какой-то причине не подходят, то вы можете написать админу: {config.ADMIN_USERNAME}"
+        f"Если они вам по какой-то причине не подходят, то вы можете написать админу: @{config.ADMIN_USERNAME}"
     ]
     if msg_type == "edit":
         await msg.edit_caption('\n'.join(message_text), reply_markup=keyboard)
@@ -728,7 +729,7 @@ async def check_referrals(call: types.CallbackQuery):
 @dp.callback_query_handler(text="information")
 async def information_message(call: types.CallbackQuery):
     keyboard = types.InlineKeyboardMarkup()
-    tech_support_btn = types.InlineKeyboardButton("👨‍💻 Техподдержка / Администратор", "https://t.me/SanjarDS")
+    tech_support_btn = types.InlineKeyboardButton("👨‍💻 Техподдержка / Администратор", f"https://t.me/{config.ADMIN_USERNAME}")
     news_btn = types.InlineKeyboardButton("📢 Новости", "https://t.me/ActiVisioNews")
     back_btn = types.InlineKeyboardButton("Назад", callback_data="main")
     keyboard.add(tech_support_btn)
