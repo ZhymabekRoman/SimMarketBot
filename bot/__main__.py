@@ -34,7 +34,7 @@ async def on_bot_startup(dp: Dispatcher):
 
     loop.create_task(poll_manager())
 
-    if not config.get(BOARD_IMAGE_FILE_ID):
+    if not config.get("BOARD_IMAGE_FILE_ID"):
         image_msg = await bot.send_photo(config.ADMIN_ID, InputFile("images/board_image.jpg"))
         file_id = image_msg.photo[-1].file_id
         config.BOARD_IMAGE_FILE_ID = file_id
