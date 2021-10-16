@@ -1,9 +1,9 @@
-from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config, bot
+from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config
 from bot import handlers
 from bot.events import qiwi_payment
 
 from aiogram import Dispatcher, executor
-from aiogram.types import BotCommand, InputFile
+from aiogram.types import BotCommand
 
 from loguru import logger
 import asyncio
@@ -33,11 +33,6 @@ async def on_bot_startup(dp: Dispatcher):
     await dp.bot.set_my_commands(commands)
 
     loop.create_task(poll_manager())
-
-    if not config.get("BOARD_IMAGE_FILE_ID"):
-        image_msg = await bot.send_photo(config.ADMIN_ID, InputFile("images/board_image.jpg"))
-        file_id = image_msg.photo[-1].file_id
-        config.BOARD_IMAGE_FILE_ID = file_id
 
 
 async def on_bot_shutdown(dp: Dispatcher):
