@@ -16,6 +16,7 @@ aioify = "0.4.0"
 python-Levenshtein = "0.12.2"
 loguru = "0.5.3"
 fuzzywuzzy = "0.18.0"
+toml = "0.10.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
