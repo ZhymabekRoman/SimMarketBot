@@ -6,13 +6,11 @@ from aiogram.dispatcher import FSMContext
 from bot import dp
 from bot.services import config
 from bot.models.user import User
-from bot.models.refills import Refill, RefillSource
+from bot.utils.backup import backup_sender
 from bot.events.payment import payment_event_handler
-from bot.utils.zip import aio_make_zip_file
 from bot.utils.utils import is_digit
 from bot.utils.bidirectional_iterator import BidirectionalIterator
 
-import os
 import asyncio
 from random import randint
 from datetime import datetime
@@ -72,12 +70,7 @@ async def admin_panel_message(message: types.Message, msg_type="answer"):
 @dp.callback_query_handler(text='make_backup')
 async def make_backup_message(call: types.CallbackQuery):
     await call.answer("Процесс резервного копирования начат, ожидайте ...", True)
-    time_now = datetime.now()
-    date_time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
-    created_backup_file = await aio_make_zip_file(f"{config.BOT_NAME}_backup_{date_time_str}", "bot/user_data/")
-    await call.bot.send_document(call.from_user.id, types.InputFile(created_backup_file))
-    os.remove(created_backup_file)
-
+    await backup_sender(call.bot, call.from_user.id)
 
 @dp.callback_query_handler(text='change_user_balance', state='*')
 async def change_user_balance_message(call: types.CallbackQuery):

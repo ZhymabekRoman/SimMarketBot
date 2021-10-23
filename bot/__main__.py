@@ -1,9 +1,9 @@
-from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config
+from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config, bot
 from bot import handlers
-from bot.events import qiwi_payment
+from bot.utils.backup import backup_sender
 
 from aiogram import Dispatcher, executor
-from aiogram.types import BotCommand
+from aiogram import types
 
 from loguru import logger
 import asyncio
@@ -19,14 +19,19 @@ async def poll_manager():
     await asyncio.sleep(random.randint(10, 60))
     loop.create_task(yoomoney_poller.run_polling())
 
+    logger.info("Start OnlineSim cache updater service ...")
     await asyncio.sleep(random.randint(10, 60))
     loop.create_task(sim_service.cache_updater())
 
+async def backup_sender_while(user_id: int, waiting_time: int = 3600):
+    while True:
+        await asyncio.sleep(waiting_time)
+        await backup_sender(bot, user_id)
 
 async def on_bot_startup(dp: Dispatcher):
     # Регистрация /-команд в интерфейсе бота
     commands = [
-        BotCommand(command="start", description="Открыть главное меню бота"),
+        types.BotCommand(command="start", description="Открыть главное меню бота"),
     ]
 
     logger.info("Register bot commands ...")
@@ -34,6 +39,7 @@ async def on_bot_startup(dp: Dispatcher):
 
     loop.create_task(poll_manager())
 
+    loop.create_task(backup_sender_while(config.ADMIN_ID))
 
 async def on_bot_shutdown(dp: Dispatcher):
     logger.info("Close sessions ...")
