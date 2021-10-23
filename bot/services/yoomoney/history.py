@@ -139,6 +139,7 @@ class History:
                 amount=param["amount"],
                 label=param["label"],
                 type=param["type"],
+                json=operation_data,
             )
             self.operations.append(operation)
         return self

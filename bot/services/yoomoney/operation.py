@@ -12,6 +12,7 @@ class Operation:
                  amount: float = None,
                  label: str = None,
                  type: str = None,
+                 json: dict = {}
                  ):
         self.operation_id = operation_id
         self.status = status
@@ -22,3 +23,4 @@ class Operation:
         self.amount = amount
         self.label = label
         self.type = type
+        self.json = json

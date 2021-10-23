@@ -4,10 +4,10 @@ import enum
 
 
 class RefillSource(enum.Enum):
-    QIWI = 0
-    ADMIN = 1
-    YOOMONEY = 2
-    REFERRAL = 3
+    QIWI = "QIWI"
+    ADMIN = "Administrator"  # Deprecated
+    YOOMONEY = "YooMoney"
+    REFERRAL = "Реферал"
 
 
 class Refill(BaseModel):

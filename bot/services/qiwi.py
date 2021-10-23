@@ -1,12 +1,14 @@
 from aioqiwi.wallet import enums
-
+from contextlib import suppress
 import datetime
 from loguru import logger
 import asyncio
 import pytz
 
+from bot.events.payment import payment_event_handler
+from bot.models.refills import RefillSource
 from bot.utils.retry import retry_on_connection_issue
-
+from bot.services import config
 
 
 class QIWIHistoryPoll:
@@ -55,7 +57,7 @@ class QIWIHistoryPoll:
         for payment in history.data:
             try:
                 logger.debug(f"Processing {payment.txn_id} from {payment.date}")
-                await self._client.handler_manager.process_event(payment)
+                await self.process_payment(payment)
             except StopIteration:  # handle exhausted iterator
                 break
 
@@ -72,3 +74,10 @@ class QIWIHistoryPoll:
             _right_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
             logger.debug("Checking new payments via QIWI history API....")
             self.loop.create_task(self.poll(_left_time, _right_time))
+
+    async def process_payment(self, payment):
+        if not payment.comment or not payment.comment.startswith(config.BOT_NAME) or not payment.comment.replace(f"{config.BOT_NAME}-", "").isdigit():
+            return
+        # with suppress(Exception):
+        user_id = payment.comment.replace(f"{config.BOT_NAME}-", "")
+        await payment_event_handler(user_id=user_id, txn_id=payment.txn_id, amount=payment.sum.amount, currency=payment.sum.currency, source=RefillSource.QIWI, extra=payment.json())

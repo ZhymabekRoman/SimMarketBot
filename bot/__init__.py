@@ -43,6 +43,7 @@ storage = JSONStorage(os.path.join("bot", "user_data", "FSM_storage.json"))
 # Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot, storage=storage)
+Bot.set_current(dp.bot)
 
 # Initalialization SQLAlchemy connection
 with resources.path("bot.user_data", "database.db") as sqlite_filepath:
@@ -72,7 +73,3 @@ yoomoney_client = Client(config.YOOMONEY_TOKEN)
 yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)
-
-for data_fq in Onlinesim.where(user_id=1689759785).all():
-    print("Do FQ")
-    data_fq.update(user_id=1022197197)

@@ -7,6 +7,7 @@ from bot import dp
 from bot.services import config
 from bot.models.user import User
 from bot.models.refills import Refill, RefillSource
+from bot.events.payment import payment_event_handler
 from bot.utils.zip import aio_make_zip_file
 from bot.utils.utils import is_digit
 from bot.utils.bidirectional_iterator import BidirectionalIterator
@@ -111,14 +112,10 @@ async def change_user_balance_step2_message(message: types.Message, state: FSMCo
         return
 
     user_data = await state.get_data()
+    amount = float(message.text)
+    generate_txn_id = randint(100, 100000)
 
-    user = User.where(user_id=user_data["user_id"]).first()
-    old_balance = float(user.balance)
-    new_balance = float(message.text)
-    user.update(balance=new_balance)
-
-    old_new_balance_distance = new_balance - old_balance
-    Refill.create(user_id=user_data["user_id"], txn_id=randint(100, 100000), source=RefillSource.ADMIN, amount=old_new_balance_distance)
+    await payment_event_handler(user_id=user_data["user_id"], txn_id=generate_txn_id, amount=amount)
 
     await state.finish()
     await message.reply("Баланс успешно изменен!", reply_markup=await generate_back_keyboard())
