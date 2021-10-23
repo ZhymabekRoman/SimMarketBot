@@ -13,8 +13,8 @@ aioqiwi = "1.1.5"
 sqlalchemy_mixins = "1.4"
 requests = "2.25.1"
 aioify = "0.4.0"
-python-Levenshtein
-fuzzywuzzy
+python-Levenshtein = "0.12.2"
+fuzzywuzzy = "0.18.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
