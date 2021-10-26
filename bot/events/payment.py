@@ -44,12 +44,12 @@ async def payment_event_handler(user_id: int, txn_id: int, amount: float, curren
         user = User.where(user_id=user_id).first()
         user.update(balance=user.balance + amount_rub)
 
-        # with suppress(Exception):
-        await bot.send_message(chat_id=user_id, text=f"[{source.value}] Ваш баланс успешно пополнен на сумму {amount_rub}. Номер транзакции: {txn_id}")
+        with suppress(Exception):
+            await bot.send_message(chat_id=user_id, text=f"[{source.value}] Ваш баланс успешно пополнен на сумму {amount_rub}. Номер транзакции: {txn_id}")
 
         message_text.append(f"Баланс успешно зачислен ID пользывателю {hlink(title=str(user_id), url=f'tg://user?id={user_id}')}")
 
         Refill.create(user_id=user_id, txn_id=txn_id, amount=amount_rub, data=extra, source=source)
 
-    # with suppress(Exception):
-    await bot.send_message(chat_id=config.ADMIN_ID, text='\n'.join(message_text), parse_mode=types.ParseMode.HTML)
+    with suppress(Exception):
+        await bot.send_message(chat_id=config.ADMIN_ID, text='\n'.join(message_text), parse_mode=types.ParseMode.HTML)
