@@ -32,7 +32,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logging.getLogger('aiogram').setLevel(logging.WARNING)
 
 # Configure loguru
-logger.add("logs/file_{time}.log", diagnose=False)  # enqueue=True,
+logger.add("logs/all_log_{time}.log", diagnose=False)  # enqueue=True,
+logger.add("logs/error_log_{time}.log", diagnose=False, level="ERROR")
 
 # Initalialization API token for work with Telegram Bot API
 API_TOKEN = base64_decode(config.API_TOKEN)
