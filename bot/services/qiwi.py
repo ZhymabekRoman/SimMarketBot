@@ -48,7 +48,7 @@ class QIWIHistoryPoll:
         )
 
         if not history.data:
-            logger.debug("No new transaction found")
+            logger.info("No new transaction found")
             return
 
         if self.process_old_to_new is True:
@@ -68,11 +68,11 @@ class QIWIHistoryPoll:
         while True:
             _left_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
 
-            logger.debug(f"Going to sleep {self.waiting_time}")
+            logger.info(f"Going to sleep {self.waiting_time}")
             await asyncio.sleep(self.waiting_time)
 
             _right_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
-            logger.debug("Checking new payments via QIWI history API....")
+            logger.info("Checking new payments via QIWI history API....")
             self.loop.create_task(self.poll(_left_time, _right_time))
 
     async def process_payment(self, payment):
