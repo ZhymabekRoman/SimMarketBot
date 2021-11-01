@@ -416,6 +416,10 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         number = task_info.number
         service_response = None
 
+    if msg_raw is None:
+        logger.error("msg_raw is None, using workaround")
+        msg_raw = []
+
     countries_list = await sim_service.countries_list()
     services_list = await sim_service.number_stats(task_info.country_code)
 

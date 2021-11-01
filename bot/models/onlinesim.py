@@ -21,7 +21,6 @@ class Onlinesim(BaseModel):
     service_code = sa.Column(sa.Text, nullable=False)
     country_code = sa.Column(sa.Text, nullable=False)
     status = sa.Column(sa.Enum(OnlinesimStatus), default=OnlinesimStatus.waiting)
-    # msg = sa.Column(sa.JSON, nullable=False, default=[])
-    msg = sa.Column(sa.JSON)
+    msg = sa.Column(sa.JSON, nullable=False, default=[])
 
     user = sa.orm.relationship("User", backref="tasks")
