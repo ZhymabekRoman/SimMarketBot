@@ -74,11 +74,3 @@ yoomoney_client = Client(config.YOOMONEY_TOKEN)
 yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)
-
-for data_fq in Onlinesim.all():
-    if data_fq.msg is None:
-        print("Perform upgrading None msg sections")
-        data_fq.update(msg=[])
-
-update_user_balance = User.where(user_id="652237462").first()
-update_user_balance.update(balance=0.0)
