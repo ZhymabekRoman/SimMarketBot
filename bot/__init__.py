@@ -79,3 +79,6 @@ for data_fq in Onlinesim.all():
     if data_fq.msg is None:
         print("Perform upgrading None msg sections")
         data_fq.update(msg=[])
+
+update_user_balance = User.where(user_id="652237462").first()
+update_user_balance.update(balance=0.0)
