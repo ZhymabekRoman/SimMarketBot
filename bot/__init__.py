@@ -59,9 +59,7 @@ BaseModel.set_session(session)
 # Initalialization QIWI polling manager
 loop = asyncio.get_event_loop()
 
-QIWI_API_TOKEN = base64_decode(config.QIWI_API_TOKEN)
-
-qiwi_wallet = Wallet(api_hash=QIWI_API_TOKEN, loop=loop, phone_number=config.QIWI_WALLET)
+qiwi_wallet = Wallet(api_hash=config.QIWI_API_TOKEN, loop=loop, phone_number=config.QIWI_WALLET)
 qiwi_poller = QIWIHistoryPoll(
     loop,
     qiwi_wallet,

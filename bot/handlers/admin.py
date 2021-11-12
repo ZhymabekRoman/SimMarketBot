@@ -6,6 +6,7 @@ from aiogram.dispatcher import FSMContext
 from bot import dp
 from bot.services import config
 from bot.models.user import User
+from bot.models.refills import Refill, RefillSource
 from bot.utils.backup import backup_sender
 from bot.events.payment import payment_event_handler
 from bot.utils.utils import is_digit
@@ -108,7 +109,16 @@ async def change_user_balance_step2_message(message: types.Message, state: FSMCo
     amount = float(message.text)
     generate_txn_id = randint(100, 100000)
 
-    await payment_event_handler(user_id=user_data["user_id"], txn_id=generate_txn_id, amount=amount)
+    # Old logic start
+    user = User.where(user_id=user_data["user_id"]).first()
+    balance = float(user.balance)
+    user.update(balance=amount)
+
+    balance_distance = amount - balance
+    Refill.create(user_id=user_data["user_id"], txn_id=generate_txn_id, source=RefillSource.ADMIN, amount=balance_distance)
+    # Old logic end
+
+    # await payment_event_handler(user_id=user_data["user_id"], txn_id=generate_txn_id, amount=amount)
 
     await state.finish()
     await message.reply("Баланс успешно изменен!", reply_markup=await generate_back_keyboard())
