@@ -36,7 +36,7 @@ class OnlineSIM:
 
     def __init__(self, api_key, loop):
         self.__api_key = api_key
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
         self.loop = loop
         self.lock = asyncio.Lock()
 
