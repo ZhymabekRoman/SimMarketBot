@@ -20,6 +20,7 @@ from bot.utils.referral import reward_referrals
 import pytz
 import datetime
 import math
+import asyncio
 from loguru import logger
 from requests.models import PreparedRequest
 from contextlib import suppress
@@ -318,7 +319,12 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         await call.answer("У вас недостаточно средств для покупки", True)
         return
 
-    status, tzid = await sim_service.getNum(service_code, country_code)
+    try:
+        status, tzid = await sim_service.getNum(service_code, country_code)
+    except asyncio.exceptions.TimeoutError:
+        await call.answer("Не удалось связаться с сервером поставщика SIM карт, попробуйте чуть позже", True)
+        await bot.send_message(chat_id=config.ADMIN_ID, text="Сервера OnlineSim не отвечают на запрос покупки номера")
+        return
 
     if status == "NO_NUMBER":
         await call.answer("Упс, оказывается номера уже закончились", True)
@@ -327,7 +333,7 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         return
     elif status in ["WARNING_LOW_BALANCE"]:
         await call.answer("Извините, что-то пошло не так", True)
-        await bot.send_message(chat_id=config.ADMIN_ID, text="ТРЕВОГА! У ВАС ПОЧТИ ЗАКОНЧИЛСЯ БАЛАНС В СЕРВИСЕ OnlineSim! СРОЧНО ПОПОЛНИТЕ!!!")
+        await bot.send_message(chat_id=config.ADMIN_ID, text="ТРЕВОГА! У ВАС ЗАКОНЧИЛСЯ БАЛАНС В СЕРВИСЕ OnlineSim! СРОЧНО ПОПОЛНИТЕ!!!")
         return
     elif status != 1:
         await call.answer("Извините, что-то пошло не так", True)

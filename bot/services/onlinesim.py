@@ -36,7 +36,7 @@ class OnlineSIM:
 
     def __init__(self, api_key, loop):
         self.__api_key = api_key
-        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3))
         self.loop = loop
         self.lock = asyncio.Lock()
 
@@ -107,7 +107,7 @@ class OnlineSIM:
 
         return _result
 
-    @retry_on_connection_issue()
+    @retry_on_connection_issue(2)
     async def getNum(self, service_code: int, country_code: int):
         url = "https://onlinesim.ru/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
