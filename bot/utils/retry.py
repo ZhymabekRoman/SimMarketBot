@@ -3,6 +3,7 @@ import asyncio
 
 from aiohttp.client_exceptions import ClientConnectorError
 
+# See also: https://github.com/litl/backoff
 
 def retry_on_connection_issue(total=5, backoff_factor=0.01):
     def retry_on_connection_issue_inner(method):

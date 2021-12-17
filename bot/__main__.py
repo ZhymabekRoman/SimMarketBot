@@ -46,7 +46,6 @@ async def on_bot_startup(dp: Dispatcher):
         country_list = await sim_service.countries_list()
         country_info = country_list.get(task.country_code)
         if not country_info:
-            # pass
             print(f"Unknown country code: {task.country_code=}")
         else:
             task.update(country_code=country_info)
@@ -61,12 +60,14 @@ async def on_bot_startup(dp: Dispatcher):
         else:
             task.update(service_code=service)
 
-    # print(await smshub._countries_list())
+    await bot.send_message(chat_id=config.ADMIN_ID, text="Бот включен")
+
 
 async def on_bot_shutdown(dp: Dispatcher):
     logger.info("Close sessions ...")
     await qiwi_wallet.close()
     await sim_service.shutdown()
+    await bot.send_message(chat_id=config.ADMIN_ID, text="Бот выключен")
     config.export_to_file("bot/user_data/config.toml")
 
 # Start Telegram bot polling

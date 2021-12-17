@@ -14,13 +14,16 @@ from bot.models import Base, BaseModel
 from bot.models.user import User
 from bot.models.onlinesim import Onlinesim
 from bot.models.refills import Refill
+
 from bot.utils.base64 import base64_decode
+from bot.utils import exit_register
 
 import sqlalchemy as sa
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm import sessionmaker
 
 from aioqiwi.wallet import Wallet
+
 from bot.services import config
 from bot.services.qiwi import QIWIHistoryPoll
 from bot.services.onlinesim import OnlineSIM
