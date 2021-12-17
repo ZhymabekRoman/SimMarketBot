@@ -24,6 +24,7 @@ from aioqiwi.wallet import Wallet
 from bot.services import config
 from bot.services.qiwi import QIWIHistoryPoll
 from bot.services.onlinesim import OnlineSIM
+from bot.services.smshub import SMSHub
 from bot.services.yoomoney import Client, YooMoneyHistoryPoll
 
 # Configure logging
@@ -72,3 +73,9 @@ yoomoney_client = Client(config.YOOMONEY_TOKEN)
 yoomoney_poller = YooMoneyHistoryPoll(loop, bot, yoomoney_client)
 
 sim_service = OnlineSIM(base64_decode(config.ONLINE_SIM_API_TOKEN), loop)
+
+if not config.get("SMS_HUB_API_TOKEN"):
+    smshub_token = input("Enter SMSHub API token: ")
+    config.SMS_HUB_API_TOKEN = smshub_token
+
+smshub = SMSHub(config.SMS_HUB_API_TOKEN, loop)

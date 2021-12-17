@@ -1,6 +1,7 @@
-from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config, bot
+from bot import dp, qiwi_poller, qiwi_wallet, loop, sim_service, yoomoney_poller, config, bot, smshub
 from bot import handlers
 from bot.utils.backup import backup_sender
+from bot.models.onlinesim import Onlinesim
 
 from aiogram import Dispatcher, executor
 from aiogram import types
@@ -40,6 +41,27 @@ async def on_bot_startup(dp: Dispatcher):
     loop.create_task(poll_manager())
 
     loop.create_task(backup_sender_while(config.ADMIN_ID))
+
+    for task in Onlinesim.all():
+        country_list = await sim_service.countries_list()
+        country_info = country_list.get(task.country_code)
+        if not country_info:
+            # pass
+            print(f"Unknown country code: {task.country_code=}")
+        else:
+            task.update(country_code=country_info)
+
+        print(f"Country list: {country_list.get('7')}")
+
+        services_list = await sim_service.number_stats(7)
+        service_info = services_list.get(task.service_code, {})
+        service = service_info.get('service')
+        if not service:
+            print(f"Unknown service code: {task.service_code}")
+        else:
+            task.update(service_code=service)
+
+    # print(await smshub._countries_list())
 
 async def on_bot_shutdown(dp: Dispatcher):
     logger.info("Close sessions ...")

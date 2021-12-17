@@ -15,6 +15,7 @@ from bot.utils.yoomoney import generate_yoomoney_payment_form_link
 from bot.utils.timedelta import readable_timedelta
 from bot.utils.sms_code import mark_sms_code
 from bot.utils.utils import is_digit
+from bot.utils.referral import reward_referrals
 
 import pytz
 import datetime
@@ -66,10 +67,11 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
         if bot_start_arguments and bot_start_arguments.isdigit():
             reffer = int(bot_start_arguments)
 
+        User.create(user_id=msg.chat.id, reffer_id=reffer)
+
         if reffer and User.where(user_id=reffer).first():
             await bot.send_message(chat_id=reffer, text=f"По вашей реф. ссылке зарегистрировался {hlink(title=str(msg.chat.id), url=f'tg://user?id={msg.chat.id}')}!", parse_mode=types.ParseMode.HTML)
-
-        User.create(user_id=msg.chat.id, reffer_id=reffer)
+            await reward_referrals(User.where(user_id=msg.chat.id).first())
 
     keyboard = types.InlineKeyboardMarkup()
     sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=countries_cb.new(1))
@@ -337,12 +339,11 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         await call.answer("Извините, что-то пошло не так", True)
         raise
 
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country_code, price=service_price, number=service_status.number)
+    countries_list = await sim_service.countries_list()
+    country = countries_list.get(country_code, "Неизвестно")
+
+    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country, price=service_price, number=service_status.number)
     user.update(balance=user_balance - service_price)
-    if user.reffer_id is not None:
-        _referral_amount = 0.25
-        Refill.create(user_id=user.reffer_id, source=RefillSource.REFERRAL, amount=_referral_amount)
-        user.reffer.update(balance=user.reffer.balance + _referral_amount)
 
     await call.answer("Номер успешно заказан!")
     await task_manager_message(call, {"tzid": tzid})
@@ -361,12 +362,7 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
         keyboard.add(no_tasks_btn)
     else:
         for task in user_operations:
-            countries_list = await sim_service.countries_list()
-            services_list = await sim_service.number_stats(task.country_code)
-
-            service = services_list.get(task.service_code, {})
-            country = countries_list.get(task.country_code, {})
-            task_btn = types.InlineKeyboardButton(f"{task.id} | {service.get('service', 'Неизвестно')} | {country}", callback_data=task_manager_cb.new(task.tzid))
+            task_btn = types.InlineKeyboardButton(f"{task.id} | {task.service_code} | {task.country_code}", callback_data=task_manager_cb.new(task.tzid))
             keyboard.add(task_btn)
 
     active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data="active_tasks")
@@ -410,21 +406,19 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         time = task.time
         number = task.number
         service_response = task.response
+        country = task.country_code
+        service = task.service_code
     else:
         msg_raw = task_info.msg
         time = 0
         number = task_info.number
-        service_response = None
+        service_response = None  # !!!???
+        country = task_info.country_code
+        service = task_info.service_code
 
     if msg_raw is None:
         logger.error("msg_raw is None, using workaround")
         msg_raw = []
-
-    countries_list = await sim_service.countries_list()
-    services_list = await sim_service.number_stats(task_info.country_code)
-
-    service = services_list.get(task_info.service_code, {})
-    country = countries_list.get(task_info.country_code, {})
 
     if task_info.status == OnlinesimStatus.waiting:
         status = "Активно"
@@ -454,7 +448,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         f"▫️ ID опреации: {task_info.id}",
         f"▫️ Номер телефона: {number}",
         f"▫️ Страна: {country}",
-        f"▫️ Сервис: {service.get('service', 'Неизвестно')}",
+        f"▫️ Сервис: {service}",
         f"▫️ Цена: {task_info.price}₽",
         f"▫️ Время покупки: {task_info.created_at.astimezone(pytz.timezone('Europe/Moscow'))} (Московское время)",
         f"▫️ Длительность действия номера: {expirity}",
@@ -509,7 +503,10 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         _task_status = OnlinesimStatus.expire
     else:
         logger.error(f"Unknown task status: {service_response}")
-        _task_status = OnlinesimStatus.cancel
+        if msg:
+            _task_status = OnlinesimStatus.success
+        else:
+            _task_status = OnlinesimStatus.cancel
 
     task_info.update(msg=msg, status=_task_status)
 
