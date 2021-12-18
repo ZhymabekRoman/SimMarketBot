@@ -348,7 +348,11 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     countries_list = await sim_service.countries_list()
     country = countries_list.get(country_code, "Неизвестно")
 
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service_code, country_code=country, price=service_price, number=service_status.number)
+    services_list = await sim_service.number_stats(country_code)
+    service_info = services_list.get(service_code, {})
+    service = service_info.get("service", "Неизвестно")
+
+    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service, country_code=country, price=service_price, number=service_status.number)
     user.update(balance=user_balance - service_price)
 
     await call.answer("Номер успешно заказан!")
@@ -359,6 +363,7 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
 async def all_operations_message(call: types.CallbackQuery, task_status: int = OnlinesimStatus.waiting):
     keyboard = types.InlineKeyboardMarkup()
     user_operations = Onlinesim.where(user_id=call.message.chat.id, status=task_status).all()
+    user_operations.reverse()
     active = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.waiting).all()
     finish = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.success).all()
     cancel = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.cancel).all()
@@ -412,15 +417,14 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         time = task.time
         number = task.number
         service_response = task.response
-        country = task.country_code
-        service = task.service_code
     else:
         msg_raw = task_info.msg
         time = 0
         number = task_info.number
         service_response = None  # !!!???
-        country = task_info.country_code
-        service = task_info.service_code
+
+    country = task_info.country_code
+    service = task_info.service_code
 
     if msg_raw is None:
         logger.error("msg_raw is None, using workaround")
