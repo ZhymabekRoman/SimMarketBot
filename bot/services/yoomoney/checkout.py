@@ -24,7 +24,7 @@ class YooMoneyHistoryPoll:
         history = await self.client.operation_history(type="deposition", from_date=left_date, till_date=right_date)
 
         if not history.operations:
-            logger.info("No new transaction found")
+            # logger.info("No new transaction found")
             return
 
         for operation in history.operations:
@@ -34,11 +34,11 @@ class YooMoneyHistoryPoll:
         while True:
             _left_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
 
-            logger.info(f"Going to sleep {self.waiting_time}")
+            # logger.info(f"Going to sleep {self.waiting_time}")
             await asyncio.sleep(self.waiting_time)
 
             _right_time = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
-            logger.info("Checking new payments via YooMoney history API....")
+            # logger.info("Checking new payments via YooMoney history API....")
             self.loop.create_task(self.poll(_left_time, _right_time))
 
     async def process_payment(self, operation):
