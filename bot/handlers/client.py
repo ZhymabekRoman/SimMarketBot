@@ -405,11 +405,20 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
 async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
     tzid = int(callback_data["tzid"])
 
-    task = await sim_service.getState(tzid)
     task_info = Onlinesim.where(tzid=tzid).first()
 
     if not task_info:
-        await call.answer("Извините, что-то пошло не так", True)
+        await call.answer("Извините, но данный заказ я не нашел в базе данных", True)
+        return
+
+    try:
+        if task_info.status == OnlinesimStatus.waiting:
+            task = await sim_service.getState(tzid)
+        else:
+            task = None
+    except asyncio.exceptions.TimeoutError:
+        await call.answer("Не удалось связаться с сервером поставщика SIM карт, попробуйте чуть позже", True)
+        await bot.send_message(chat_id=config.ADMIN_ID, text="Сервера OnlineSim не отвечают на запрос покупки номера")
         return
 
     if task:
@@ -718,7 +727,7 @@ async def check_referrals(call: types.CallbackQuery):
     forward_url = _frwd_telegram_req.url
 
     keyboard = types.InlineKeyboardMarkup()
-    forward_link_btn = types.InlineKeyboardButton("Поделиться ссылкой", forward_url)
+    forward_link_btn = types.InlineKeyboardButton("🔗 Поделиться ссылкой", forward_url)
     back_btn = types.InlineKeyboardButton("Назад", callback_data="main")
     keyboard.add(forward_link_btn)
     keyboard.add(back_btn)

@@ -129,3 +129,5 @@ dmypy.json
 .pyre/
 
 bot/user_data*
+
+*.swp

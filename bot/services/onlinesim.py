@@ -123,7 +123,7 @@ class OnlineSIM:
 
         return status, tzid
 
-    @retry_on_connection_issue()
+    @retry_on_connection_issue(2)
     async def getState(
         self,
         tzid: int,
