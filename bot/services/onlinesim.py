@@ -39,6 +39,7 @@ class OnlineSIM:
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3))
         self.loop = loop
         self.lock = asyncio.Lock()
+        self.country2flag = Country2Flag()
 
     async def countries_list(self):
         return self._cache["countries_list"]
@@ -51,12 +52,19 @@ class OnlineSIM:
 
         async with self.session.get(url=url, params=params) as response:
             result = await response.text()
-            parsed = json.loads(result)
+            try:
+                parsed = json.loads(result)
+            except Exception:
+                logger.error(f"Can not parse countries list. Result: {result}")
 
         _result = {}
         for country_code, country in parsed.items():
             if country["visible"] == 1 and await self._summary_numbers_count(country_code) != 0:
-                _result.update({country_code: f'{Country2Flag().get(country_code)} {country["rus"]}'})
+                country_flag = self.country2flag.get(country_code)
+                if not country_flag:
+                    logger.error(f"Unknown country flag. ID: {country_code}. Name: {country['rus']}")
+                country_name = f'{country_flag} {country["rus"]}'
+                _result.update({country_code: country_name})
 
         async with self.lock:
             self._cache["countries_list"] = _result

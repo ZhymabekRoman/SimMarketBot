@@ -7,8 +7,4 @@ class Country2Flag:
 
     def get(self, country_code):
         country_flag =  self.countries_flags_dict.get(country_code, "")
-
-        if not country_flag:
-            logger.error(f"Unknown country id: {country_code}")
-
         return country_flag

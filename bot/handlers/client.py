@@ -373,7 +373,7 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
         keyboard.add(no_tasks_btn)
     else:
         for task in user_operations:
-            task_btn = types.InlineKeyboardButton(f"{task.id} | {task.service_code} | {task.country_code}", callback_data=task_manager_cb.new(task.tzid))
+            task_btn = types.InlineKeyboardButton(f"№{task.id} | {task.service_code} | {task.country_code}", callback_data=task_manager_cb.new(task.tzid))
             keyboard.add(task_btn)
 
     active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data="active_tasks")
@@ -499,10 +499,6 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     task = await sim_service.getState(tzid)
     task_info = Onlinesim.where(tzid=tzid).first()
 
-    # if close_task_info.get("response") != "1":
-    #     await call.answer("Извините, операцию нельзя завершить сейчас, попробуйте чуть позже", True)
-    #     return
-
     if task:
         msg = task.msg
         service_response = task.response
@@ -531,7 +527,6 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
 
     close_task_info = await sim_service.setOperationOk(tzid)
     await task_manager_message(call, callback_data)
-    # await call.answer("Задача успешно отменена")
 
 
 @dp.callback_query_handler(text="balance", state='*')
@@ -567,7 +562,7 @@ async def refill_history_message(call: types.CallbackQuery):
         keyboard.add(no_refills_btn)
     else:
         for refill in user_refills:
-            refill_btn = types.InlineKeyboardButton(f"{refill.source.name} | +{refill.amount}", callback_data="refill_manager")
+            refill_btn = types.InlineKeyboardButton(f"{refill.source.name} | {refill.amount}", callback_data="refill_manager")
             keyboard.add(refill_btn)
     back_btn = types.InlineKeyboardButton("Назад", callback_data="balance")
     keyboard.add(back_btn)

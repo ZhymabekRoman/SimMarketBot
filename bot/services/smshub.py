@@ -1,6 +1,7 @@
 import json
 import aiohttp
 import asyncio
+import random
 
 from bot.utils.json_storager import JSONCacher
 from bot.utils.country2flag import Country2Flag
@@ -34,11 +35,15 @@ class getStateModel(BaseModel):
 class SMSHub:
     _cache = JSONCacher("bot/user_data/SMSHub.json")
 
-    def __init__(self, api_key, loop):
+    def __init__(self, api_key: list, loop):
         self.__api_key = api_key
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
         self.loop = loop
         self.lock = asyncio.Lock()
+
+    @property
+    def api(self):
+        return random.choice(self.__api_key)
 
     async def countries_list(self):
         return self._cache["countries_list"]
