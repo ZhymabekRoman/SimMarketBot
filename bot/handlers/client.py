@@ -480,7 +480,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         keyboard.add(cancel_task_btn)
         update_btn = types.InlineKeyboardButton("♻️ Обновить", callback_data=task_manager_cb.new(tzid))
         keyboard.add(update_btn)
-    black_btn = types.InlineKeyboardButton("Назад", callback_data="active_tasks")
+    black_btn = types.InlineKeyboardButton("Назад", callback_data=all_operation_cb.new(1, OnlinesimStatus.waiting.value))
     keyboard.add(black_btn)
 
     expirity = readable_timedelta(datetime.timedelta(seconds=time))
