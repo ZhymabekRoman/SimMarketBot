@@ -8,6 +8,7 @@ from aiogram import types
 from loguru import logger
 import asyncio
 import random
+import json
 
 
 async def poll_manager():
@@ -43,6 +44,8 @@ async def on_bot_startup(dp: Dispatcher):
 
     await bot.send_message(chat_id=config.ADMIN_ID, text="Бот включен")
 
+    # with open("robaa.txt", "w") as file:
+    #     json.dump(await smshub._countries_list(), file, sort_keys=True, indent=4)
 
 async def on_bot_shutdown(dp: Dispatcher):
     logger.info("Close sessions ...")

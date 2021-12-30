@@ -36,11 +36,9 @@ refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
 countries_page_navigation_cb = CallbackData("countries_page_navigation", "pages")
 services_page_navigation_cb = CallbackData("services_page_navigation", "country_code", "pages")
 service_search_cb = CallbackData("service_search", "country_code")
+all_operation_cb = CallbackData("all_operation", "page", "status")
 
-# class ReciveSMS(StatesGroup):
-#     waiting_country = State()
-#     waiting_service = State()
-
+ELEMENTS_ON_PAGE = 9
 
 class PaymentMethod(StatesGroup):
     waiting_amount = State()
@@ -76,7 +74,7 @@ async def main_menu_message(msg: types.Message, msg_type="answer"):
 
     keyboard = types.InlineKeyboardMarkup()
     sms_recieve_country_btn = types.InlineKeyboardButton("📲 Купить номер", callback_data=countries_cb.new(1))
-    all_sms_operations_btn = types.InlineKeyboardButton("📫 Все СМС операции", callback_data="all_operations")
+    all_sms_operations_btn = types.InlineKeyboardButton("📫 Все СМС операции", callback_data=all_operation_cb.new(1, OnlinesimStatus.waiting.value))
     partners_btn = types.InlineKeyboardButton("👥 Партнёрская программа", callback_data="partners")
     balance_btn = types.InlineKeyboardButton("💳 Баланс", callback_data="balance")
     information_btn = types.InlineKeyboardButton("ℹ️ Информация", callback_data="information")
@@ -147,7 +145,7 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
 
     page = int(callback_data["page"])
     countries_list = await sim_service.countries_list()
-    pages_number = math.ceil(float(len(countries_list)) / float(15))
+    pages_number = math.ceil(float(len(countries_list)) / float(ELEMENTS_ON_PAGE))
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
     for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
@@ -185,6 +183,10 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
     await state.finish()
 
     page = int(callback_data["page"])
+    page_index = page - 1
+    page_index_start_position = page_index * ELEMENTS_ON_PAGE
+    page_index_end_position = page_index_start_position + ELEMENTS_ON_PAGE
+
     country_code = callback_data["country_code"]
     services_list = await sim_service.number_stats(country_code)
     pages_number = math.ceil(float(len(services_list)) / float(15))
@@ -193,7 +195,7 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
     country = countries_list.get(country_code)
 
     keyboard_markup = types.InlineKeyboardMarkup()
-    for service_code, service in list(services_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
+    for service_code, service in list(services_list.items())[page_index_start_position : page_index_end_position]:
         service_btn = types.InlineKeyboardButton(f"{service['service']} ({service['count']})", callback_data=service_cb.new(country_code, service_code))
         keyboard_markup.insert(service_btn)
 
@@ -359,31 +361,37 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     await task_manager_message(call, {"tzid": tzid})
 
 
-@dp.callback_query_handler(text="all_operations")
-async def all_operations_message(call: types.CallbackQuery, task_status: int = OnlinesimStatus.waiting):
-    keyboard = types.InlineKeyboardMarkup()
+@dp.callback_query_handler(all_operation_cb.filter())
+async def all_operations_message(call: types.CallbackQuery, callback_data: dict):
+    page = int(callback_data["page"])
+    page_index = page - 1
+    page_index_start_position = page_index * ELEMENTS_ON_PAGE
+    page_index_end_position = page_index_start_position + ELEMENTS_ON_PAGE
+
+    task_status = OnlinesimStatus(int(callback_data["status"]))
+
     user_operations = Onlinesim.where(user_id=call.message.chat.id, status=task_status).all()
     user_operations.reverse()
+
+    pages_number = math.ceil(float(len(user_operations)) / float(ELEMENTS_ON_PAGE))
+
+    keyboard = types.InlineKeyboardMarkup()
     active = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.waiting).all()
     finish = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.success).all()
     cancel = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.cancel).all()
-    expire = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.expire).all()
+
     if not user_operations:
         no_tasks_btn = types.InlineKeyboardButton("👓 Нет заказов", callback_data="tester")
         keyboard.add(no_tasks_btn)
     else:
-        for task in user_operations:
+        for task in user_operations[page_index_start_position : page_index_end_position]:
             task_btn = types.InlineKeyboardButton(f"№{task.id} | {task.service_code} | {task.country_code}", callback_data=task_manager_cb.new(task.tzid))
             keyboard.add(task_btn)
 
-    active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data="active_tasks")
-    finished_tasks_btn = types.InlineKeyboardButton(f"✅ выполненные ({len(finish)})", callback_data="finished_tasks")
-    canceled_tasks_btn = types.InlineKeyboardButton(f"❌ отмененные ({len(cancel)})", callback_data="canceled_tasks")
-    expired_tasks_btn = types.InlineKeyboardButton(f"🕰 истекшие  ({len(expire)})", callback_data="expired_tasks")
-    back_btn = types.InlineKeyboardButton("Назад", callback_data="main")
-    keyboard.row(active_tasks_btn, finished_tasks_btn)
-    keyboard.row(canceled_tasks_btn, expired_tasks_btn)
-    keyboard.add(back_btn)
+    active_tasks_btn = types.InlineKeyboardButton(f"♻️ активные ({len(active)})", callback_data=all_operation_cb.new(1, OnlinesimStatus.waiting.value))
+    finished_tasks_btn = types.InlineKeyboardButton(f"✅ выполненные ({len(finish)})", callback_data=all_operation_cb.new(1, OnlinesimStatus.success.value))
+    canceled_tasks_btn = types.InlineKeyboardButton(f"❌ отмененные ({len(cancel)})", callback_data=all_operation_cb.new(1, OnlinesimStatus.cancel.value))
+    keyboard.row(active_tasks_btn, finished_tasks_btn, canceled_tasks_btn)
 
     if task_status == OnlinesimStatus.waiting:
         task_type_name = "♻️ Активные"
@@ -391,13 +399,30 @@ async def all_operations_message(call: types.CallbackQuery, task_status: int = O
         task_type_name = "✅ Выполненные"
     elif task_status == OnlinesimStatus.cancel:
         task_type_name = "❌ Отмененные"
-    elif task_status == OnlinesimStatus.expire:
-        task_type_name = "🕰 Истекшие"
+
+    plagination_keyboard_list = []
+
+    if page > 1:
+        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=all_operation_cb.new(page - 1, task_status.value))
+        plagination_keyboard_list.append(previous_page_btn)
+
+    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="rrr")
+    plagination_keyboard_list.append(pages_number_btn)
+
+    if page < pages_number:
+        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=all_operation_cb.new(page + 1, task_status.value))
+        plagination_keyboard_list.append(next_page_btn)
+
+    keyboard.row(*plagination_keyboard_list)
+
+    back_btn = types.InlineKeyboardButton("Назад", callback_data="main")
+    keyboard.add(back_btn)
 
     message_text = f"{task_type_name} операции ({len(user_operations)}):"
 
     with suppress(exceptions.MessageNotModified):
         await call.message.edit_caption(message_text, reply_markup=keyboard)
+
     await call.answer()
 
 
@@ -443,8 +468,6 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
         status = "Активно"
     elif task_info.status == OnlinesimStatus.success:
         status = "Успешно"
-    elif task_info.status == OnlinesimStatus.expire:
-        status = "Истекло время ожидании"
     elif task_info.status == OnlinesimStatus.cancel:
         status = "Отменена"
 
@@ -514,8 +537,6 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
         _task_status = OnlinesimStatus.success
     elif service_response == "TZ_NUM_WAIT":
         _task_status = OnlinesimStatus.cancel
-    elif service_response == "TZ_OVER_EMPTY":
-        _task_status = OnlinesimStatus.expire
     else:
         logger.error(f"Unknown task status: {service_response}")
         if msg:
@@ -772,17 +793,6 @@ async def callback_handler(call: types.CallbackQuery):
     if answer_data == "balance_btn":
         await balance_message(call.message, "edit")
         await call.answer()
-    elif answer_data == 'active_tasks':
-        await all_operations_message(call, OnlinesimStatus.waiting)
-        await call.answer()
-    elif answer_data == 'finished_tasks':
-        await all_operations_message(call, OnlinesimStatus.success)
-        await call.answer()
-    elif answer_data == 'canceled_tasks':
-        await all_operations_message(call, OnlinesimStatus.cancel)
-        await call.answer()
-    elif answer_data == 'expired_tasks':
-        await all_operations_message(call, OnlinesimStatus.expire)
-        await call.answer()
     else:
+        logger.error(f"Unknown callback data: {answer_data}")
         await call.answer("Функция не реализована", True)

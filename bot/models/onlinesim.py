@@ -7,7 +7,6 @@ class OnlinesimStatus(enum.Enum):
     waiting = 0  # TZ_NUM_WAIT
     success = 1  # TZ_OVER_OK
     cancel = 2  # Cancelled by user without msg
-    expire = 3  # TZ_OVER_EMPTY
 
 
 class Onlinesim(BaseModel):

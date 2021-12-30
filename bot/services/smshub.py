@@ -11,25 +11,7 @@ from loguru import logger
 from fuzzywuzzy import process, fuzz
 from pydantic import BaseModel, validator
 
-
-class getStateModel(BaseModel):
-    country: int
-    form: str
-    number: str
-    response: str
-    service: str
-    sum: int
-    time: int
-    tzid: int
-    msg: list = []
-
-    @validator("msg", pre=True, always=True)
-    def set_msg(cls, msg_raw):
-        msg_list = []
-        for msg in msg_raw:
-            received_msg = msg.get("msg", "")
-            msg_list.append(received_msg)
-        return msg_list
+from icecream import ic
 
 
 class SMSHub:
@@ -37,37 +19,35 @@ class SMSHub:
 
     def __init__(self, api_key: list, loop):
         self.__api_key = api_key
+        self.url = "https://smshub.org/stubs/handler_api.php"
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
         self.loop = loop
         self.lock = asyncio.Lock()
 
     @property
-    def api(self):
+    def api_key(self):
         return random.choice(self.__api_key)
 
     async def countries_list(self):
         return self._cache["countries_list"]
 
-    @retry_on_connection_issue()
-    async def _countries_list(self):
-        # Using alternative API
-        url = "https://smshub.org/stubs/handler_api.php"
-        params = {"api_key": self.__api_key, "action": "getPrices"}
+    async def request(self, external_params: dict):
+        params = {"api_key": self.api_key}
+        params.update(external_params)
 
-        async with self.session.get(url=url, params=params) as response:
+        async with self.session.get(url=self.url, params=params) as response:
             result = await response.text()
+            ic(result)
             parsed = json.loads(result)
 
-        # _result = {}
-        # for country_code, country in parsed.items():
-        #     if country["visible"] == 1 and await self._summary_numbers_count(country_code) != 0:
-        #         _result.update({country_code: f'{Country2Flag().get(country_code)} {country["rus"]}'})
+        # TODO: write exception catch and raise mechanic
 
-        async with self.lock:
-            self._cache["countries_list"] = parsed
-
-        # return _result
         return parsed
+
+    @retry_on_connection_issue()
+    async def _countries_list(self):
+        countries_list = await self.request({"action": "getCountries"})
+        return countries_list
 
     async def number_stats(self, country_code: int):
         _cache_key = str({"number_stats": str(country_code)})
@@ -184,7 +164,7 @@ class SMSHub:
         return parsed
 
     @retry_on_connection_issue()
-    async def setOperationOk(self, tzid: int) -> getStateModel:
+    async def setOperationOk(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationOk.php"
         params = {
             "apikey": self.__api_key,
