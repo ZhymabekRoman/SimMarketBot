@@ -1,0 +1,15 @@
+# /etc/systemd/system/
+
+[Unit]
+Description=SimMarket
+After=network.target
+
+[Service]
+User=root
+Type=simple
+WorkingDirectory=~/SimMarketBot
+ExecStart=/usr/local/bin/poetry run python3 -m bot
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

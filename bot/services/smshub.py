@@ -1,3 +1,6 @@
+# Based on: https://github.com/Viiprogrammer/getSMS/blob/main/index.js
+
+
 import json
 import aiohttp
 import asyncio
@@ -14,12 +17,60 @@ from pydantic import BaseModel, validator
 from icecream import ic
 
 
+class SMSHubResponse:
+    def __init__(self, data: str):
+        self.data = data
+
+    def json(self):
+        return json.loads(self.data)
+
+
+class SMSHubException(Exception):
+    errors_list = {
+        'BAD_KEY': 'Invalid api key',
+        'ERROR_SQL': 'Server database error',
+        'BAD_ACTION': 'Bad request data',
+        'WRONG_SERVICE': 'Wrong service identifier',
+        'BAD_SERVICE': 'Wrong service name',
+        'NO_ACTIVATION': 'Activation not found.',
+        'NO_BALANCE': 'No balance',
+        'NO_NUMBERS': 'No numbers',
+        'WRONG_ACTIVATION_ID': 'Wrong activation id',
+        'WRONG_EXCEPTION_PHONE': 'Wrong exception phone',
+        'NO_BALANCE_FORWARD': 'No balance for forward',
+        'NOT_AVAILABLE': 'Multiservice is not available for selected country',
+        'BAD_FORWARD': 'Incorrect forward',
+        'WRONG_ADDITIONAL_SERVICE': 'Wrong additional service',
+        'WRONG_SECURITY': 'WRONG_SECURITY error',
+        'REPEAT_ADDITIONAL_SERVICE': 'Repeat additional service error'
+    }
+
+    def __init__(self, status_code, message = None):
+        unknown_status_code_msg = "Unknown error. Error code: {}".format(status_code)
+        if message is None:
+            self.message = self.errors_list.get(status_code, unknown_status_code_msg)
+        else:
+            self.message = message
+
+        self.status_code = status_code
+
+    @classmethod
+    def check(cls, status_code: str):
+        if isinstance(status_code, str):
+            if status_code in cls.errors_list:
+                return cls(status_code)
+
+    def __str__(self):
+        return "{} | {}".format(self.status_code, self.message)
+
+
 class SMSHub:
     _cache = JSONCacher("bot/user_data/SMSHub.json")
 
     def __init__(self, api_key: list, loop):
         self.__api_key = api_key
-        self.url = "https://smshub.org/stubs/handler_api.php"
+        self.api_url = "https://smshub.org/api.php"
+        self.stub_api_url = "https://smshub.org/stubs/handler_api.php"
         self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
         self.loop = loop
         self.lock = asyncio.Lock()
@@ -28,72 +79,93 @@ class SMSHub:
     def api_key(self):
         return random.choice(self.__api_key)
 
-    async def countries_list(self):
-        return self._cache["countries_list"]
-
-    async def request(self, external_params: dict):
+    @retry_on_connection_issue(2)
+    async def request(self, url: str, external_params: dict):
         params = {"api_key": self.api_key}
         params.update(external_params)
 
-        async with self.session.get(url=self.url, params=params) as response:
+        headers = {
+            'cookie': 'lang=ru',  # ЫАААААА!? На дворе 2022 год, мать честная! Нахуя блять указывать куки в хэйдере запроса? В хэйдере блять!?
+        }
+
+        async with self.session.get(url=url, params=params, headers=headers) as response:
             result = await response.text()
-            ic(result)
-            parsed = json.loads(result)
 
-        # TODO: write exception catch and raise mechanic
+            # Не возможно узнать по статус коду ответа завершилась ли текущая операция ошибкой либо все успешно
+            # Приходится в ручную проверять
+            exception_check = SMSHubException.check(result)
+            if exception_check:
+                raise exception_check
 
-        return parsed
+        return SMSHubResponse(result)
 
-    @retry_on_connection_issue()
+    async def countries_list(self):
+        return self._cache.get("countries_list", [])
+
     async def _countries_list(self):
-        countries_list = await self.request({"action": "getCountries"})
-        return countries_list
+        return (await self._get_list_of_countries_and_service())["data"]
 
-    async def number_stats(self, country_code: int):
-        _cache_key = str({"number_stats": str(country_code)})
-        return self._cache[_cache_key]
+    async def _get_list_of_countries_and_service(self):
+        """
+        Response model:
 
-    @retry_on_connection_issue()
-    async def _number_stats(self, country_code: int):
-        url = "https://onlinesim.ru/api/getNumbersStats.php"
-        params = {"apikey": self.__api_key, "country": country_code}
+        {
+            "currentCountry": null,
+            "currentOperator": null,
+            "data": [
+                {
+                    "id": "0",
+                    "name": "\u0420\u043e\u0441\u0441\u0438\u044f",
+                    "operators": [
+                        "any"
+                    ]
+                }
+            ]
+            ,
+            "services": {
+                    "ab": "Alibaba"
+            },
+            "status": "success"
+        }
+        """
+        list_of_countries_and_services = (await self.request(self.api_url, {'cat': 'scripts', 'act': 'manageActivations', 'asc': 'getListOfCountriesAndOperators'})).json()
+        return list_of_countries_and_services
 
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
+    async def services_list(self):
+        return self._cache.get("services_list", {})
 
-        _result = {}
-        if not isinstance(parsed["services"], list):  # Workaround for OnlineSim's bug
-            for _, service in parsed["services"].items():
-                if service["count"] != 0:
-                    _result.update({service["slug"]: service})
+    async def _services_list(self):
+        return (await self._get_list_of_countries_and_service())["services"]
 
-        async with self.lock:
-            _cache_key = str({"number_stats": str(country_code)})
-            self._cache[_cache_key] = _result
+    async def numbers_status(self, country_code: int):
+        _cache_key = str({"numbers_status": str(country_code)})
+        return self._cache.get(_cache_key, {})
 
-        return _result
+    async def _numbers_status(self, country_code: int):
+        """
+        Response model:
 
-    async def summary_numbers_count(self, country_code: int):
-        _cache_key = str({"summary_numbers_count": str(country_code)})
-        return self._cache[_cache_key]
+        {
+          "vk": {
+            "priceMap": {
+              "9.00": 12793,
+              "8.99": 8130
+            },
+            "maxPrice": 9.00,
+            "defaultPrice": 9.00,
+            "defaultMaxPrice": true,
+            "random": true,
+            "quantityForMaxPrice": 20923,
+            "totalQuantity": 20923,
+            "canAuction": false,
+            "auctionMap": [],
+            "work": true
+          }
+        }
+        """
+        numbers_status = (await self.request(self.stub_api_url, {'action': 'getNumbersStatusAndCostHubFree', 'country': '0', 'operator': 'any'})).json()
+        return numbers_status
 
-    @retry_on_connection_issue()
-    async def _summary_numbers_count(self, country_code: int):
-        services_list = await self._number_stats(country_code)
-
-        _result = 0
-
-        for service_code, service_info in services_list.items():
-            _result += service_info["count"]
-
-        async with self.lock:
-            _cache_key = str({"summary_numbers_count": str(country_code)})
-            self._cache[_cache_key] = _result
-
-        return _result
-
-    @retry_on_connection_issue()
     async def getNum(self, service_code: int, country_code: int):
         url = "https://onlinesim.ru/api/getNum.php"
         params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
@@ -109,7 +181,6 @@ class SMSHub:
 
         return status, tzid
 
-    @retry_on_connection_issue()
     async def getState(
         self,
         tzid: int,
@@ -148,7 +219,6 @@ class SMSHub:
         else:
             raise
 
-    @retry_on_connection_issue()
     async def setOperationRevise(self, tzid: int):
         url = "https://onlinesim.ru/api/setOperationRevise.php"
         params = {

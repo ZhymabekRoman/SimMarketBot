@@ -33,6 +33,9 @@ class JSONCacher(dict):
     def __contains__(self, key):
         return self.cache_storage.get(key, None)
 
+    def get(self, key, default = None):
+        return self.cache_storage.get(key, default)
+
     def shutdown(self):
         with open(self.storage_file, "w") as file:
             json.dump(self.cache_storage, file)
