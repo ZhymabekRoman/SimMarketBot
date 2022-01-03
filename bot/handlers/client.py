@@ -38,7 +38,8 @@ services_page_navigation_cb = CallbackData("services_page_navigation", "country_
 service_search_cb = CallbackData("service_search", "country_code")
 all_operation_cb = CallbackData("all_operation", "page", "status")
 
-ELEMENTS_ON_PAGE = 9
+LOW_ELEMENTS_ON_PAGE = 9
+MAX_ELEMENTS_ON_PAGE = 15
 
 class PaymentMethod(StatesGroup):
     waiting_amount = State()
@@ -145,10 +146,16 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
 
     page = int(callback_data["page"])
     countries_list = await sim_service.countries_list()
-    pages_number = math.ceil(float(len(countries_list)) / float(ELEMENTS_ON_PAGE))
+    if countries_list:
+        pages_number = math.ceil(float(len(countries_list)) / float(MAX_ELEMENTS_ON_PAGE))
+    else:
+        pages_number = 1
+    page_index = page - 1
+    page_index_start_position = page_index * MAX_ELEMENTS_ON_PAGE
+    page_index_end_position = page_index_start_position + MAX_ELEMENTS_ON_PAGE
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
-    for country_code, country_name in list(countries_list.items())[(page - 1) * 15: ((page - 1) * 15) + 15]:
+    for country_code, country_name in list(countries_list.items())[page_index_start_position : page_index_end_position]:
         summary_numbers = await sim_service.summary_numbers_count(country_code)
         country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=country_services_cb.new(1, country_code))
         keyboard_markup.insert(country_btn)
@@ -184,12 +191,15 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
 
     page = int(callback_data["page"])
     page_index = page - 1
-    page_index_start_position = page_index * ELEMENTS_ON_PAGE
-    page_index_end_position = page_index_start_position + ELEMENTS_ON_PAGE
+    page_index_start_position = page_index * MAX_ELEMENTS_ON_PAGE
+    page_index_end_position = page_index_start_position + MAX_ELEMENTS_ON_PAGE
 
     country_code = callback_data["country_code"]
     services_list = await sim_service.number_stats(country_code)
-    pages_number = math.ceil(float(len(services_list)) / float(15))
+    if services_list:
+        pages_number = math.ceil(float(len(services_list)) / float(MAX_ELEMENTS_ON_PAGE))
+    else:
+        pages_number = 1
 
     countries_list = await sim_service.countries_list()
     country = countries_list.get(country_code)
@@ -365,15 +375,18 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
 async def all_operations_message(call: types.CallbackQuery, callback_data: dict):
     page = int(callback_data["page"])
     page_index = page - 1
-    page_index_start_position = page_index * ELEMENTS_ON_PAGE
-    page_index_end_position = page_index_start_position + ELEMENTS_ON_PAGE
+    page_index_start_position = page_index * LOW_ELEMENTS_ON_PAGE
+    page_index_end_position = page_index_start_position + LOW_ELEMENTS_ON_PAGE
 
     task_status = OnlinesimStatus(int(callback_data["status"]))
 
     user_operations = Onlinesim.where(user_id=call.message.chat.id, status=task_status).all()
     user_operations.reverse()
 
-    pages_number = math.ceil(float(len(user_operations)) / float(ELEMENTS_ON_PAGE))
+    if user_operations:
+        pages_number = math.ceil(float(len(user_operations)) / float(LOW_ELEMENTS_ON_PAGE))
+    else:
+        pages_number = 1
 
     keyboard = types.InlineKeyboardMarkup()
     active = Onlinesim.where(user_id=call.message.chat.id, status=OnlinesimStatus.waiting).all()
