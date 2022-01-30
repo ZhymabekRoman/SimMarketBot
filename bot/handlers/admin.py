@@ -193,8 +193,4 @@ async def mailing_message(call: types.CallbackQuery, state: FSMContext):
         finally:
             await asyncio.sleep(mailing_delay_sec)
             if users.index == 0 or (users.index + 1) % 10 == 0 or users.index + 1 == len(users):
-                try:
-                    await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))
-                except RetryAfter as ex:
-                    print("Retry After was interpreted")
-                    await asyncio.sleep(ex.timeout * 1.5)
+                await call.message.edit_text('\n'.join(admin_mailing_info).format(success_mailing_num, unsuccess_mailing_num, bot_blocked_users_num))

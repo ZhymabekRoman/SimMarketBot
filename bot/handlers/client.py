@@ -1,6 +1,7 @@
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 from aiogram.utils.callback_data import CallbackData
+from aiogram.utils.deep_linking import get_start_link
 from aiogram.utils.markdown import hlink
 from aiogram import types
 from aiogram.utils import exceptions
@@ -16,6 +17,7 @@ from bot.utils.timedelta import readable_timedelta
 from bot.utils.sms_code import mark_sms_code
 from bot.utils.utils import is_digit
 from bot.utils.referral import reward_referrals
+from bot.utils.country2flag import Country2Flag
 
 import pytz
 import datetime
@@ -26,20 +28,23 @@ from requests.models import PreparedRequest
 from contextlib import suppress
 
 countries_cb = CallbackData("countries", "page")
-country_services_cb = CallbackData("country_services", "page", "country_code")
-service_cb = CallbackData("service", "country_code", "service_code")
-buy_number_cb = CallbackData("buy_service_number", "country_code", "service_code", "price")
+country_services_cb = CallbackData("country_services", "page", "country_code", "operator")
+country_operator_cb = CallbackData("country_operator", "country_code")
+service_cb = CallbackData("service", "country_code", "operator", "service_code")
+buy_number_cb = CallbackData("buy_service_number", "country_code", "service_code", "operator", "price")
 task_manager_cb = CallbackData("task_manager", "tzid")
 cancel_task_cb = CallbackData("cancel_task", "tzid")
 paymemt_method_cb = CallbackData("paymemt_method", "amount")
 refill_balance_via_cb = CallbackData("refill_via", "amount", "method")
 countries_page_navigation_cb = CallbackData("countries_page_navigation", "pages")
 services_page_navigation_cb = CallbackData("services_page_navigation", "country_code", "pages")
-service_search_cb = CallbackData("service_search", "country_code")
+service_search_cb = CallbackData("service_search", "country_code", "operator")
 all_operation_cb = CallbackData("all_operation", "page", "status")
 
 LOW_ELEMENTS_ON_PAGE = 9
 MAX_ELEMENTS_ON_PAGE = 15
+
+country2flag = Country2Flag()
 
 class PaymentMethod(StatesGroup):
     waiting_amount = State()
@@ -129,7 +134,7 @@ async def country_search_result_message(msg: types.Message, state: FSMContext):
     keyboard_markup = types.InlineKeyboardMarkup()
 
     for search_result in search_results[:15]:
-        result_btn = types.InlineKeyboardButton(f"{search_result[0]} ({search_result[1]}%)", callback_data=country_services_cb.new(page=1, country_code=search_result[2]))
+        result_btn = types.InlineKeyboardButton(f"{country2flag.get(search_result[0])} {search_result[0]} ({search_result[1]}%)", callback_data=country_operator_cb.new(country_code=search_result[2]))
         keyboard_markup.add(result_btn)
 
     back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(page=1))
@@ -145,7 +150,7 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     await state.finish()
 
     page = int(callback_data["page"])
-    countries_list = await sim_service.countries_list()
+    countries_list = await sim_service._countries_list()
     if countries_list:
         pages_number = math.ceil(float(len(countries_list)) / float(MAX_ELEMENTS_ON_PAGE))
     else:
@@ -155,9 +160,11 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     page_index_end_position = page_index_start_position + MAX_ELEMENTS_ON_PAGE
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=3)
-    for country_code, country_name in list(countries_list.items())[page_index_start_position : page_index_end_position]:
-        summary_numbers = await sim_service.summary_numbers_count(country_code)
-        country_btn = types.InlineKeyboardButton(f"{country_name} ({summary_numbers})", callback_data=country_services_cb.new(1, country_code))
+    for country in countries_list[page_index_start_position : page_index_end_position]:
+        # summary_numbers = await sim_service.summary_numbers_count(country_code)
+        # country_btn = types.InlineKeyboardButton(f"{country.get('name', 'Unknown')} ({summary_numbers})", callback_data=country_operator_cb.new(country.get('id')))
+        country_flag = country2flag.get(country.get("name"))
+        country_btn = types.InlineKeyboardButton(f"{country_flag} {country.get('name', 'Unknown')}", callback_data=country_operator_cb.new(country.get('id')))
         keyboard_markup.insert(country_btn)
 
     search_btn = types.InlineKeyboardButton("🔍 Поиск", callback_data="country_search")
@@ -169,7 +176,7 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
         previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=countries_cb.new(page - 1))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=countries_page_navigation_cb.new(pages_number))
+    pages_number_btn = types.InlineKeyboardButton(f"📖 Страница: {page} из {pages_number}", callback_data=countries_page_navigation_cb.new(pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
@@ -185,6 +192,47 @@ async def sms_recieve_country_set_message(call: types.CallbackQuery, state: FSMC
     await call.answer()
 
 
+@dp.callback_query_handler(country_operator_cb.filter(), state='*')
+async def country_operator_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
+    country_code = callback_data["country_code"]
+    countries_list = await sim_service._countries_list()
+
+    for _country in countries_list:
+        if country_code == _country.get("id"):
+            country = _country
+            break
+    else:
+        await call.answer("Извините, что-то пошло не так. Код ошибки: x847392", True)
+        return
+
+    country_operators_list = country.get("operators")
+
+    if len(country_operators_list) == 1 and "any" in country_operators_list:
+        await country_services_message(call, {"page": 1, "country_code": country_code, "operator": "any"}, state)
+        return
+
+    keyboard_markup = types.InlineKeyboardMarkup()
+    all_operators_btn = types.InlineKeyboardButton("Все", callback_data=country_services_cb.new(page=1, country_code=country_code, operator="any"))
+    keyboard_markup.insert(all_operators_btn)
+    for operator in country_operators_list:
+        if operator == "any":
+            continue
+        operator_btn = types.InlineKeyboardButton(operator.capitalize(), callback_data=country_services_cb.new(page=1, country_code=country_code, operator=operator))
+        keyboard_markup.insert(operator_btn)
+
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
+    keyboard_markup.add(back_btn)
+
+    message_text = [
+            f"🌍 Выбранная страна: {country2flag.get(country.get('name'))} {country.get('name', 'Unknown')}",
+            "",
+            "2. Веберите оператора номера",
+    ]
+
+    await call.message.edit_caption("\n".join(message_text), reply_markup=keyboard_markup)
+    await call.answer()
+
+
 @dp.callback_query_handler(country_services_cb.filter(), state='*')
 async def country_services_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     await state.finish()
@@ -195,49 +243,73 @@ async def country_services_message(call: types.CallbackQuery, callback_data: dic
     page_index_end_position = page_index_start_position + MAX_ELEMENTS_ON_PAGE
 
     country_code = callback_data["country_code"]
-    services_list = await sim_service.number_stats(country_code)
+    operator = callback_data["operator"]
+    services_list = await sim_service._numbers_status(country_code, operator)
     if services_list:
         pages_number = math.ceil(float(len(services_list)) / float(MAX_ELEMENTS_ON_PAGE))
     else:
         pages_number = 1
 
-    countries_list = await sim_service.countries_list()
-    country = countries_list.get(country_code)
+    countries_list = await sim_service._countries_list()
+    services_list_names = await sim_service._services_list()
+
+    for _country in countries_list:
+        if country_code == _country.get("id"):
+            country = _country
+            break
+    else:
+        await call.answer("Извините, что-то пошло не так. Код ошибки: x847392", True)
+        return
+
+    country_operators_list = country.get("operators")
 
     keyboard_markup = types.InlineKeyboardMarkup()
     for service_code, service in list(services_list.items())[page_index_start_position : page_index_end_position]:
-        service_btn = types.InlineKeyboardButton(f"{service['service']} ({service['count']})", callback_data=service_cb.new(country_code, service_code))
+        service_name = services_list_names.get(service_code, "Unknown")
+        # service_btn = types.InlineKeyboardButton(f"{service_name} ({service['quantityForMaxPrice']})", callback_data=service_cb.new(country_code, operator, service_code))
+        service_btn = types.InlineKeyboardButton(f"{service_name}", callback_data=service_cb.new(country_code, operator, service_code))
         keyboard_markup.insert(service_btn)
 
-    search_btn = types.InlineKeyboardButton("🔍 Поиск", callback_data=service_search_cb.new(country_code))
+    search_btn = types.InlineKeyboardButton("🔍 Поиск", callback_data=service_search_cb.new(country_code, operator))
     keyboard_markup.add(search_btn)
 
     plagination_keyboard_list = []
 
     if page > 1:
-        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=country_services_cb.new(page - 1, country_code))
+        previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=country_services_cb.new(page - 1, country_code, operator))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data=services_page_navigation_cb.new(country_code, pages_number))
+    pages_number_btn = types.InlineKeyboardButton(f"📖 Страница: {page} из {pages_number}", callback_data=services_page_navigation_cb.new(country_code, pages_number))
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
-        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=country_services_cb.new(page + 1, country_code))
+        next_page_btn = types.InlineKeyboardButton("➡️", callback_data=country_services_cb.new(page + 1, country_code, operator))
         plagination_keyboard_list.append(next_page_btn)
 
     keyboard_markup.row(*plagination_keyboard_list)
 
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
+    if len(country_operators_list) == 1 and "any" in country_operators_list:
+        back_btn = types.InlineKeyboardButton("Назад", callback_data=countries_cb.new(1))
+    else:
+        back_btn = types.InlineKeyboardButton("Назад", callback_data=country_operator_cb.new(country_code))
+
     keyboard_markup.add(back_btn)
 
-    await call.message.edit_caption(f"🌍 Выбранная страна: {country}\n2. Веберите сервис, от которого вам необходимо принять СМС", reply_markup=keyboard_markup)
+    message_text = [
+            f"🌍 Выбранная страна: {country2flag.get(country.get('name'))} {country.get('name', 'Unknown')}",
+            f"📱 Выбранный оператор: {operator.capitalize() if operator != 'any' else 'Все'}",
+            "",
+            "3. Веберите сервис, от которого вам необходимо принять СМС"
+    ]
+
+    await call.message.edit_caption("\n".join(message_text), reply_markup=keyboard_markup)
     await call.answer()
 
 
 @dp.callback_query_handler(services_page_navigation_cb.filter())
 async def services_page_navigation_message(call: types.CallbackQuery, callback_data: dict):
     pages = int(callback_data["pages"])
-    country_code = int(callback_data["country_code"])
+    country_code = callback_data["country_code"]
 
     keyboard_markup = types.InlineKeyboardMarkup(row_width=5)
     for page in range(pages):
@@ -254,14 +326,15 @@ async def services_page_navigation_message(call: types.CallbackQuery, callback_d
 @dp.callback_query_handler(service_search_cb.filter())
 async def service_search_message(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     country_code = int(callback_data["country_code"])
+    operator = callback_data["operator"]
 
     keyboard_markup = types.InlineKeyboardMarkup()
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code, operator))
     keyboard_markup.add(back_btn)
 
     await call.message.edit_caption("🔍 Введите название сервиса для поиска в оригинальном названии без транслита. Например: telegram", reply_markup=keyboard_markup)
     await Search.waiting_service_search_text.set()
-    await state.update_data({"country_code": country_code})
+    await state.update_data({"country_code": country_code, "operator": operator})
     await call.answer()
 
 
@@ -271,16 +344,17 @@ async def service_search_result_message(msg: types.Message, state: FSMContext):
 
     user_data = await state.get_data()
     country_code = user_data["country_code"]
+    operator = user_data["operator"]
 
-    search_results = await sim_service.fuzzy_services_search(country_code, search_text)
+    search_results = await sim_service.fuzzy_services_search(country_code, operator, search_text)
 
     keyboard_markup = types.InlineKeyboardMarkup()
 
     for search_result in search_results[:15]:
-        result_btn = types.InlineKeyboardButton(f"{search_result[0]} ({search_result[1]}%)", callback_data=service_cb.new(country_code, search_result[2]))
+        result_btn = types.InlineKeyboardButton(f"{search_result[0]} ({search_result[1]}%)", callback_data=service_cb.new(country_code, operator, search_result[2]))
         keyboard_markup.add(result_btn)
 
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code, operator=operator))
     keyboard_markup.add(back_btn)
 
     await msg.answer_photo(config.BOARD_IMAGE_FILE_ID, caption=f"🔍 Результаты поиска ({len(search_results)}):", reply_markup=keyboard_markup)
@@ -292,25 +366,36 @@ async def service_search_result_message(msg: types.Message, state: FSMContext):
 async def service_message(call: types.CallbackQuery, callback_data: dict):
     country_code = callback_data["country_code"]
     service_code = callback_data["service_code"]
+    operator = callback_data["operator"]
 
-    countries_list = await sim_service.countries_list()
-    services_list = await sim_service.number_stats(country_code)
+    countries_list = await sim_service._countries_list()
+    services_list_names = await sim_service._services_list()
 
+    for _country in countries_list:
+        if country_code == _country.get("id"):
+            country = _country
+            break
+    else:
+        await call.answer("Извините, что-то пошло не так. Код ошибки: x847392", True)
+        return
+
+    country_operators_list = country.get("operators")
+    services_list = await sim_service._numbers_status(country_code, operator)
     service = services_list.get(service_code)
-    country = countries_list.get(country_code)
-    price = (service['price'] * (config.COMMISSION_AMOUNT / 100)) + service['price']
+    price = (service.get("defaultPrice") * (config.COMMISSION_AMOUNT / 100)) + service['defaultPrice']
 
     message_text = [
-        f"▫️ Выбранный сервис: {service.get('service')}",
-        f"▫️ Выбранная страна: {country}",
+        f"▫️ Выбранный сервис: {services_list_names.get(service_code)}",
+        f"▫️ Выбранный оператор: {operator.capitalize() if operator != 'any' else 'Все'}",
+        f"▫️ Выбранная страна: {country2flag.get(country.get('name'))} {country.get('name', 'Unknown')}",
         "",
         f"▫️ Цена: {price}₽",
-        f"▫️ В наличии: {service.get('count')} номеров"
+        # f"▫️ В наличии: {service.get('count')} номеров"
     ]
 
     keyboard_markup = types.InlineKeyboardMarkup()
-    buy_btn = types.InlineKeyboardButton("Купить", callback_data=buy_number_cb.new(country_code, service_code, price))
-    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code))
+    buy_btn = types.InlineKeyboardButton("Купить", callback_data=buy_number_cb.new(country_code, service_code, operator, price))
+    back_btn = types.InlineKeyboardButton("Назад", callback_data=country_services_cb.new(1, country_code, operator))
     keyboard_markup.add(buy_btn)
     keyboard_markup.add(back_btn)
 
@@ -322,7 +407,8 @@ async def service_message(call: types.CallbackQuery, callback_data: dict):
 async def buy_service_number_message(call: types.CallbackQuery, callback_data: dict):
     country_code = callback_data["country_code"]
     service_code = callback_data["service_code"]
-    service_price = float(callback_data["price"])
+    operator = callback_data["operator"]
+    price = float(callback_data["price"])
 
     user = User.where(user_id=call.message.chat.id).first()
     user_balance = user.balance
@@ -332,43 +418,47 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
         return
 
     try:
-        status, tzid = await sim_service.getNum(service_code, country_code)
-    except asyncio.exceptions.TimeoutError:
-        await call.answer("Не удалось связаться с сервером поставщика SIM карт, попробуйте чуть позже", True)
-        await bot.send_message(chat_id=config.ADMIN_ID, text="Сервера OnlineSim не отвечают на запрос покупки номера")
-        return
-
-    if status == "NO_NUMBER":
-        await call.answer("Упс, оказывается номера уже закончились", True)
-        await sim_service.update_number_count(country_code, service_code)
-        await service_message(call, callback_data)
-        return
-    elif status in ["WARNING_LOW_BALANCE"]:
-        await call.answer("Извините, что-то пошло не так", True)
-        await bot.send_message(chat_id=config.ADMIN_ID, text="ТРЕВОГА! У ВАС ЗАКОНЧИЛСЯ БАЛАНС В СЕРВИСЕ OnlineSim! СРОЧНО ПОПОЛНИТЕ!!!")
-        return
-    elif status != 1:
-        await call.answer("Извините, что-то пошло не так", True)
-        return
-
-    try:
-        service_status = await sim_service.getState(tzid)
+        status = await sim_service.get_number(service_code, operator, country_code)
     except Exception:
-        await call.answer("Извините, что-то пошло не так", True)
+        await call.answer("Неизвестная ошибка во время покупки номеров", True)
         raise
 
-    countries_list = await sim_service.countries_list()
-    country = countries_list.get(country_code, "Неизвестно")
+    if status == "NO_NUMBERS":
+        await call.answer("Упс, оказывается номера уже закончились", True)
+        # TODO
+        # await sim_service.update_number_count(country_code, service_code)
+        # await service_message(call, callback_data)
+        return
+    elif status in ["NO_BALANCE"]:
+        await call.answer("Извините, что-то пошло не так", True)
+        await bot.send_message(chat_id=config.ADMIN_ID, text="ТРЕВОГА! У ВАС ЗАКОНЧИЛСЯ БАЛАНС В SMSHub! СРОЧНО ПОПОЛНИТЕ!!!")
+        return
+    elif len(status.split(":")) != 3:
+        await call.answer("Извините, что-то пошло не так", True)
+        return
 
-    services_list = await sim_service.number_stats(country_code)
-    service_info = services_list.get(service_code, {})
-    service = service_info.get("service", "Неизвестно")
+    _, id, number = status.split(":")
 
-    Onlinesim.create(user_id=call.message.chat.id, tzid=tzid, service_code=service, country_code=country, price=service_price, number=service_status.number)
-    user.update(balance=user_balance - service_price)
+    countries_list = await sim_service._countries_list()
+    services_list_names = await sim_service._services_list()
+
+    for _country in countries_list:
+        if country_code == _country.get("id"):
+            country = _country
+            break
+    else:
+        await call.answer("Извините, что-то пошло не так. Код ошибки: x847392", True)
+        return
+
+    country = f"{country2flag.get(country.get('name'))} {country.get('name', 'Unknown')}"
+    service = f"{services_list_names.get(service_code)}"
+    operator = f"{operator.capitalize() if operator != 'any' else 'Все'}"
+
+    SMSHub.create(user_id=call.message.chat.id, task_id=id, service=service, operator=operator, country=country, price=price, number=number)
+    user.update(balance=user_balance - price)
 
     await call.answer("Номер успешно заказан!")
-    await task_manager_message(call, {"tzid": tzid})
+    await task_manager_message(call, {"task_id": id})
 
 
 @dp.callback_query_handler(all_operation_cb.filter())
@@ -747,8 +837,8 @@ async def check_referrals(call: types.CallbackQuery):
     for referral in referrals_refils:
         referrals_balance += referral.amount
 
-    bot_username = (await call.bot.me).username
-    bot_link = f"https://t.me/{bot_username}?start={call.message.chat.id}"
+    bot_link = await get_start_link(call.message.chat.id)
+
     _frwd_telegram_url = "https://t.me/share/url"
     _frwd_telegram_params = {"url": bot_link, "text": f"{config.BOT_NAME} - сервис для приёма SMS сообщений"}
     _frwd_telegram_req = PreparedRequest()

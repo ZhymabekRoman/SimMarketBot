@@ -18,11 +18,11 @@ from icecream import ic
 
 
 class SMSHubResponse:
-    def __init__(self, data: str):
-        self.data = data
+    def __init__(self, text: str):
+        self.text = text
 
     def json(self):
-        return json.loads(self.data)
+        return json.loads(self.text)
 
 
 class SMSHubException(Exception):
@@ -45,7 +45,7 @@ class SMSHubException(Exception):
         'REPEAT_ADDITIONAL_SERVICE': 'Repeat additional service error'
     }
 
-    def __init__(self, status_code, message = None):
+    def __init__(self, status_code: str, message = None):
         unknown_status_code_msg = "Unknown error. Error code: {}".format(status_code)
         if message is None:
             self.message = self.errors_list.get(status_code, unknown_status_code_msg)
@@ -71,7 +71,7 @@ class SMSHub:
         self.__api_key = api_key
         self.api_url = "https://smshub.org/api.php"
         self.stub_api_url = "https://smshub.org/stubs/handler_api.php"
-        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5))
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40))
         self.loop = loop
         self.lock = asyncio.Lock()
 
@@ -137,11 +137,11 @@ class SMSHub:
     async def _services_list(self):
         return (await self._get_list_of_countries_and_service())["services"]
 
-    async def numbers_status(self, country_code: int):
+    async def numbers_status(self, country_code: str):
         _cache_key = str({"numbers_status": str(country_code)})
         return self._cache.get(_cache_key, {})
 
-    async def _numbers_status(self, country_code: int):
+    async def _numbers_status(self, country_code: str, operator_code: str):
         """
         Response model:
 
@@ -163,96 +163,24 @@ class SMSHub:
           }
         }
         """
-        numbers_status = (await self.request(self.stub_api_url, {'action': 'getNumbersStatusAndCostHubFree', 'country': '0', 'operator': 'any'})).json()
+        numbers_status = (await self.request(self.stub_api_url, {'action': 'getNumbersStatusAndCostHubFree', 'country': country_code, 'operator': operator_code})).json()
         return numbers_status
 
-    async def getNum(self, service_code: int, country_code: int):
-        url = "https://onlinesim.ru/api/getNum.php"
-        params = {"apikey": self.__api_key, "country": country_code, "service": service_code}
+    async def get_number(self, service_code: str, operator_code: str, country_code: str):
+        number_stats = await self.request(self.stub_api_url, {'action': 'getNumber', 'country': country_code, 'service': service_code, 'operator': operator_code}).text
+        return number_stats
 
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
-
-        logger.debug(parsed)
-
-        status = parsed.get("response")
-        tzid = parsed.get("tzid")
-
-        return status, tzid
-
-    async def getState(
-        self,
-        tzid: int,
-        message_to_code: int = 0,
-        msg_list: bool = 1,
-        clean: bool = 0,
-        repeat: bool = 0,
-    ):
-        type = "index"
-        if repeat:
-            type = "repeat"
-
-        url = "https://onlinesim.ru/api/getState.php"
-        params = {
-            "apikey": self.__api_key,
-            "tzid": tzid,
-            "message_to_code": message_to_code,
-            "msg_list": msg_list,
-            "clean": clean,
-            "type": type,
-        }
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
-
-        logger.debug(parsed)
-
-        if isinstance(parsed, dict):
-            if parsed.get("response") == "ERROR_NO_OPERATIONS":
-                return None
-
-        # OnlineSim return list, with entered tzid's operation, just for more stability let find operation by tzid manually
-        for _service in parsed:
-            if _service.get("tzid") == tzid:
-                return getStateModel(**_service)
-        else:
-            raise
-
-    async def setOperationRevise(self, tzid: int):
-        url = "https://onlinesim.ru/api/setOperationRevise.php"
-        params = {
-            "apikey": self.__api_key,
-            "tzid": tzid
-        }
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
-
-        logger.debug(parsed)
-
-        return parsed
-
-    @retry_on_connection_issue()
-    async def setOperationOk(self, tzid: int):
-        url = "https://onlinesim.ru/api/setOperationOk.php"
-        params = {
-            "apikey": self.__api_key,
-            "tzid": tzid
-        }
-        async with self.session.get(url=url, params=params) as response:
-            result = await response.text()
-            parsed = json.loads(result)
-
-        logger.debug(parsed)
-
-        return parsed
+    async def get_status(self, id: int):
+        number_stats = await self.request(self.stub_api_url, {'action': 'getStatus', 'id': id}).text
+        number_stats_code, code = number_stats.split(":")
+        return number_stats_code, code
 
     async def cache_updater(self, waiting_time: int = 3600):
         while True:
             await asyncio.sleep(waiting_time)
             self.loop.create_task(self._countries_list())
 
+    """
     async def update_number_count(self, country_code, service_code, new_count: int = 0):
         country_code, service_code = str(country_code), str(service_code)
         _cache_key = str({"number_stats": str(country_code)})
@@ -261,16 +189,23 @@ class SMSHub:
         _result.update({"count": new_count})
 
         self._cache[_cache_key][service_code] = _result
+    """
 
-    async def fuzzy_countries_search(self, search_text):
-        countries_list_ru = await self.countries_list()
+    async def fuzzy_countries_search(self, search_text:str):
+        countries_list_ru = {}
+
+        for country in await self._countries_list():
+            countries_list_ru.update({country.get("id"): country.get("name", "Unknown")})
+
         return process.extractBests(search_text, countries_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
 
-    async def fuzzy_services_search(self, country_code, search_text):
+    async def fuzzy_services_search(self, country_code: str, operator:str, search_text: str):
+        services_list = await self._services_list()
         services_list_ru = {}
 
-        for service_code, service in (await self.number_stats(country_code)).items():
-            services_list_ru.update({service_code: service["service"]})
+        for service_code in (await self._numbers_status(country_code, operator)).keys():
+            service_name = services_list.get(service_code)
+            services_list_ru.update({service_code: service_name})
 
         return process.extractBests(search_text, services_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
 
