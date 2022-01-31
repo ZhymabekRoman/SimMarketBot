@@ -433,14 +433,16 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
             # await sim_service.update_number_count(country_code, service_code)
             # await service_message(call, callback_data)
         else:
-            await call.answer("Извините, что-то пошло не так", True)
+            await call.answer("Извините, что-то пошло не так. Код ошибки: sae6f5b4635ae1f2", True)
+            logger.error(f"Error while buying number: {ex}")
         return
     except Exception:
         await call.answer("Неизвестная ошибка во время покупки номеров", True)
         raise
 
     if len(status.split(":")) != 3:
-        await call.answer("Извините, что-то пошло не так", True)
+        await call.answer("Извините, что-то пошло не так. Код ошибки: 984K68W789", True)
+        logger.error(f"Server returned number status not 3 lenght: {status}")
         return
 
     _, id, number = status.split(":")

@@ -177,7 +177,7 @@ class SMSHub:
         return number_stats
 
     async def set_status(self, id: int, status: int):
-        number_stats = await self.request(self.stub_api_url, {'action': 'setStatus', 'id': id, 'status': status}).text
+        number_stats = (await self.request(self.stub_api_url, {'action': 'setStatus', 'id': id, 'status': status})).text
         return number_stats
 
     async def get_full_sms(self, id: int):
