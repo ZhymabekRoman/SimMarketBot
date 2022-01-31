@@ -460,11 +460,11 @@ async def buy_service_number_message(call: types.CallbackQuery, callback_data: d
     service = f"{services_list_names.get(service_code)}"
     operator = f"{operator.capitalize() if operator != 'any' else 'Все'}"
 
-    SMSHub.create(user_id=call.message.chat.id, task_id=id, service=service, operator=operator, country=country, price=price, number=number)
+    task_info = SMSHub.create(user_id=call.message.chat.id, task_id=id, service=service, operator=operator, country=country, price=price, number=number)
     user.update(balance=user_balance - price)
 
     await call.answer("Номер успешно заказан!")
-    await task_manager_message(call, {"id": id})
+    await task_manager_message(call, {"id": task_info.id})
 
 
 @dp.callback_query_handler(all_operation_cb.filter())
@@ -515,7 +515,7 @@ async def all_operations_message(call: types.CallbackQuery, callback_data: dict)
         previous_page_btn = types.InlineKeyboardButton("⬅️", callback_data=all_operation_cb.new(page - 1, task_status.value))
         plagination_keyboard_list.append(previous_page_btn)
 
-    pages_number_btn = types.InlineKeyboardButton(f"Страница: {page} из {pages_number}", callback_data="rrr")
+    pages_number_btn = types.InlineKeyboardButton(f"📖 Страница: {page} из {pages_number}", callback_data="rrr")
     plagination_keyboard_list.append(pages_number_btn)
 
     if page < pages_number:
