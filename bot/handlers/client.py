@@ -610,7 +610,7 @@ async def task_manager_message(call: types.CallbackQuery, callback_data: dict):
 
     await call.answer()
 
-    if task_info.status == SMSHubStatus.waiting and task_info.msg:
+    if task_info.status == SMSHubStatus.waiting and set_msg:
         set_status_response = await sim_service.set_status(task_info.task_id, 3)
         ic(set_status_response)
 
@@ -620,10 +620,6 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
     id = int(callback_data["id"])
     task_info = SMSHub.where(id=id).first()
     task_status = await sim_service.get_status(task_info.task_id)
-
-    if not task_info.msg:
-        user = User.where(user_id=call.message.chat.id).first()
-        user.update(balance=user.balance + task_info.price)
 
     if task_status in ["STATUS_CANCEL", "STATUS_WAIT_CODE"]:
         task_status = SMSHubStatus.cancel
@@ -641,6 +637,15 @@ async def cancel_task_message(call: types.CallbackQuery, callback_data: dict):
             task_status = SMSHubStatus.success
         else:
             task_status = SMSHubStatus.cancel
+
+    try:
+        msg
+    except Exception:
+        msg = task_info.msg
+
+    if not msg:
+        user = User.where(user_id=call.message.chat.id).first()
+        user.update(balance=user.balance + task_info.price)
 
     task_info = task_info.update(status=task_status)
 
