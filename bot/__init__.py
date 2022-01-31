@@ -13,6 +13,7 @@ from aiogram import Bot, Dispatcher
 from bot.models import Base, BaseModel
 from bot.models.user import User
 from bot.models.onlinesim import Onlinesim
+from bot.models.smshub import SMSHub
 from bot.models.refills import Refill
 
 from bot.utils.base64 import base64_decode

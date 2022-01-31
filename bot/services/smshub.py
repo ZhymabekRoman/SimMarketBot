@@ -100,7 +100,7 @@ class SMSHub:
         return SMSHubResponse(result)
 
     async def countries_list(self):
-        return self._cache.get("countries_list", [])
+        return self._cache.get("list_of_countries_and_services", {}).get("data", [])
 
     async def _countries_list(self):
         return (await self._get_list_of_countries_and_service())["data"]
@@ -132,13 +132,13 @@ class SMSHub:
         return list_of_countries_and_services
 
     async def services_list(self):
-        return self._cache.get("services_list", {})
+        return self._cache.get("list_of_countries_and_services", {}).get("services")
 
     async def _services_list(self):
         return (await self._get_list_of_countries_and_service())["services"]
 
-    async def numbers_status(self, country_code: str):
-        _cache_key = str({"numbers_status": str(country_code)})
+    async def numbers_status(self, country_code: str, operator_code: str):
+        _cache_key = str({"numbers_status": f"{country_code}_{operator_code}"})
         return self._cache.get(_cache_key, {})
 
     async def _numbers_status(self, country_code: str, operator_code: str):
@@ -167,18 +167,35 @@ class SMSHub:
         return numbers_status
 
     async def get_number(self, service_code: str, operator_code: str, country_code: str):
-        number_stats = await self.request(self.stub_api_url, {'action': 'getNumber', 'country': country_code, 'service': service_code, 'operator': operator_code}).text
+        number_stats = (await self.request(self.stub_api_url, {'action': 'getNumber', 'country': country_code, 'service': service_code, 'operator': operator_code})).text
         return number_stats
 
     async def get_status(self, id: int):
-        number_stats = await self.request(self.stub_api_url, {'action': 'getStatus', 'id': id}).text
-        number_stats_code, code = number_stats.split(":")
-        return number_stats_code, code
+        number_stats = (await self.request(self.stub_api_url, {'action': 'getStatus', 'id': id})).text
+        # number_stats_code, code = number_stats.split(":")
+        # return number_stats_code, code
+        return number_stats
+
+    async def set_status(self, id: int, status: int):
+        number_stats = await self.request(self.stub_api_url, {'action': 'setStatus', 'id': id, 'status': status}).text
+        return number_stats
+
+    async def get_full_sms(self, id: int):
+        full_sms_status = (await self.request(self.stub_api_url, {'action': 'getFullSms', 'id': id})).text
+        return full_sms_status
 
     async def cache_updater(self, waiting_time: int = 3600):
         while True:
-            await asyncio.sleep(waiting_time)
-            self.loop.create_task(self._countries_list())
+            _countries_list, _services_list = await self.countries_list(), await self.services_list()
+            if _countries_list and _services_list:
+                await asyncio.sleep(waiting_time)
+            try:
+                list_of_countries_and_services = await self._get_list_of_countries_and_service()
+            except Exception as ex:
+                logger.error(f"Error while updating cache: {ex}")
+            else:
+                self._cache["list_of_countries_and_services"] = list_of_countries_and_services
+                logger.info("Succeful updated cache")
 
     """
     async def update_number_count(self, country_code, service_code, new_count: int = 0):
@@ -194,7 +211,7 @@ class SMSHub:
     async def fuzzy_countries_search(self, search_text:str):
         countries_list_ru = {}
 
-        for country in await self._countries_list():
+        for country in await self.countries_list():
             countries_list_ru.update({country.get("id"): country.get("name", "Unknown")})
 
         return process.extractBests(search_text, countries_list_ru, scorer=fuzz.WRatio, score_cutoff=70)
